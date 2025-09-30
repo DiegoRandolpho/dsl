@@ -152,11 +152,7 @@
                 );
             }
             
-           /* INÍCIO DO CÓDIGO ATUALIZADO PARA TicketAbastecimentos */
-
-/* INÍCIO DO CÓDIGO ATUALIZADO PARA TicketAbastecimentos */
-
-/* INÍCIO DO CÓDIGO ATUALIZADO PARA TicketAbastecimentos */
+  /* INÍCIO DO CÓDIGO ATUALIZADO PARA TicketAbastecimentos */
 
 function TicketAbastecimentos({ user, showToast }) {
     const [abastecimentos, setAbastecimentos] = React.useState([]);
@@ -165,7 +161,6 @@ function TicketAbastecimentos({ user, showToast }) {
     const [file, setFile] = React.useState(null);
     const [isImporting, setIsImporting] = React.useState(false);
 
-    // ATUALIZADO: Nome do filtro de 'estabelecimento' para 'nome_estabelecimento'
     const [filters, setFilters] = React.useState({ placa: '', data: '', cidade: '', nome_estabelecimento: '' });
     const [hasSearched, setHasSearched] = React.useState(false);
 
@@ -186,7 +181,6 @@ function TicketAbastecimentos({ user, showToast }) {
         try {
             let query = supabase.from('ticket_abastecimentos').select('*');
 
-            // ATUALIZADO: Filtros ajustados para os novos campos
             if (filters.placa) query = query.ilike('placa', `%${filters.placa.trim()}%`);
             if (filters.cidade) query = query.ilike('cidade', `%${filters.cidade.trim()}%`);
             if (filters.nome_estabelecimento) query = query.ilike('nome_estabelecimento', `%${filters.nome_estabelecimento.trim()}%`);
@@ -226,24 +220,28 @@ function TicketAbastecimentos({ user, showToast }) {
                 const worksheet = workbook.Sheets[sheetName];
                 const json = XLSX.utils.sheet_to_json(worksheet);
 
-                // ATUALIZADO: Lógica de importação conforme sua especificação.
-                const dataToInsert = json.map(row => ({
-                    codigo_transacao: row['CODIGO TRANSACAO'],
-                    servico: row['SERVICO'],
-                    data_transacao: row['DATA TRANSACAO'],
-                    placa: row['PLACA'],
-                    tipo_combustivel: row['TIPO COMBUSTIVEL'],
-                    litros: parseFloat(row['LITROS']) || 0,
-                    vl_litro: parseFloat(row['VL/LITRO']) || 0,
-                    valor_emissao: parseFloat(row['VALOR EMISSAO']) || 0,
-                    nome_estabelecimento: row['NOME ESTABELECIMENTO'],
-                    cidade: row['CIDADE'],
-                    uf: row['UF'],
-                    info_adicional1: row['INFORMACAO ADICIONAL 1'],
-                    numero_cartao: row['NUMERO CARTAO'],
-                    usuario_criacao: user.nome,
-                    data_criacao: new Date().toISOString(),
-                }));
+                const dataToInsert = json.map(row => {
+                    const transacaoDate = row['DATA TRANSACAO'];
+
+                    return {
+                        codigo_transacao: row['CODIGO TRANSACAO'],
+                        servico: row['SERVICO'],
+                        // CORREÇÃO: Converte o objeto de data para uma string no formato ISO
+                        data_transacao: transacaoDate instanceof Date ? transacaoDate.toISOString() : null,
+                        placa: row['PLACA'],
+                        tipo_combustivel: row['TIPO COMBUSTIVEL'],
+                        litros: parseFloat(row['LITROS']) || 0,
+                        vl_litro: parseFloat(row['VL/LITRO']) || 0,
+                        valor_emissao: parseFloat(row['VALOR EMISSAO']) || 0,
+                        nome_estabelecimento: row['NOME ESTABELECIMENTO'],
+                        cidade: row['CIDADE'],
+                        uf: row['UF'],
+                        info_adicional1: row['INFORMACAO ADICIONAL 1'],
+                        numero_cartao: row['NUMERO CARTAO'],
+                        usuario_criacao: user.nome,
+                        data_criacao: new Date().toISOString(),
+                    };
+                });
 
                 if (dataToInsert.length === 0) {
                     showToast("Nenhum dado válido encontrado na planilha.", "info");
@@ -283,7 +281,6 @@ function TicketAbastecimentos({ user, showToast }) {
             React.createElement('button', { onClick: handleImport, disabled: isImporting, className: "w-full p-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 transition" }, isImporting ? 'Importando...' : 'Importar Dados')
         ),
 
-        // ATUALIZADO: Campo 'estabelecimento' agora é 'nome_estabelecimento'
         React.createElement('div', { className: "mb-6 p-4 border rounded-lg bg-gray-50 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end" },
             React.createElement('div', null,
                 React.createElement('label', { className: "block text-sm font-medium" }, "Placa"),
@@ -304,7 +301,6 @@ function TicketAbastecimentos({ user, showToast }) {
             React.createElement('button', { onClick: handleSearch, disabled: isLoading, className: "w-full p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition" }, isLoading ? 'Buscando...' : 'Buscar')
         ),
 
-        // ATUALIZADO: Tabela de visualização com as novas colunas
         React.createElement('div', { className: "rounded-lg border border-slate-200 shadow-sm overflow-hidden" },
             React.createElement('table', { className: "w-full text-sm text-left text-slate-600" },
                 React.createElement('thead', { className: "text-xs text-slate-700 uppercase bg-slate-100" },
@@ -336,12 +332,6 @@ function TicketAbastecimentos({ user, showToast }) {
 }
 
 /* FIM DO CÓDIGO ATUALIZADO */
-
-/* FIM DO CÓDIGO ATUALIZADO */
-
-/* FIM DO CÓDIGO ATUALIZADO */
-            // --- ESQUELETO: CTA Carregamentos ---
-            /* INÍCIO DO CÓDIGO ATUALIZADO PARA CtaCarregamentos */
 
 /* INÍCIO DO CÓDIGO ATUALIZADO PARA CtaCarregamentos */
 
