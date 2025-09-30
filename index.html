@@ -223,17 +223,17 @@ function TicketAbastecimentos({ user, showToast }) {
                 const json = XLSX.utils.sheet_to_json(worksheet);
 
                 const dataToInsert = json.map(row => ({
-                    data_transacao: row['Data da Transação'],
-                    placa: row['Placa'],
-                    produto: row['Produto'],
-                    litros: parseFloat(row['Litros']) || 0,
-                    valor_emissao: parseFloat(row['Valor da Emissão']) || 0,
-                    estabelecimento: row['Estabelecimento'],
-                    cidade: row['Cidade'],
+                    data_transacao: row['DATA TRANSACAO'],
+                    placa: row['PLACA'],
+                    produto: row['TIPO COMBUSTIVEL'],
+                    litros: parseFloat(row['LITROS']) || 0,
+                    valor_emissao: parseFloat(row['VALOR EMISSAO']) || 0,
+                    estabelecimento: row['NOME ESTABELECIMENTO'],
+                    cidade: row['CIDADE'],
                     uf: row['UF'],
-                    motorista: row['Motorista'],
+                    info_adicional1: row['INFORMACAO ADICIONAL 1'],
                     // CORRIGIDO: Campo 'cartao' alterado para 'numero_cartao'
-                    numero_cartao: row['Cartão'],
+                    numero_cartao: row['NUMERO CARTAO'],
                     usuario_criacao: user.nome,
                     data_criacao: new Date().toISOString(),
                 }));
