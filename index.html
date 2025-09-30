@@ -166,6 +166,8 @@
 
 /* INÍCIO DO CÓDIGO ATUALIZADO PARA CtaCarregamentos */
 
+/* INÍCIO DO CÓDIGO ATUALIZADO PARA CtaCarregamentos */
+
 function CtaCarregamentos({ user, showToast }) {
     const [carregamentos, setCarregamentos] = React.useState([]);
     const [isLoading, setIsLoading] = React.useState(true);
@@ -174,13 +176,11 @@ function CtaCarregamentos({ user, showToast }) {
     const initialFormState = { cod_posto: '', volume: '', custo: '', preco_por_litro: '', nota_fiscal: '', fornecedor: '', entrega: '' };
     const [formData, setFormData] = React.useState(initialFormState);
 
-    // NOVO: Estados para controlar a importação de arquivo
     const [file, setFile] = React.useState(null);
     const [isImporting, setIsImporting] = React.useState(false);
 
     const formatDate = (dateString) => {
         if (!dateString) return '—';
-        // Tenta converter datas numéricas do Excel (comuns em arquivos .xls)
         if (typeof dateString === 'number' && dateString > 1) {
             const date = new Date(Math.round((dateString - 25569) * 86400 * 1000));
             return date.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
@@ -195,7 +195,7 @@ function CtaCarregamentos({ user, showToast }) {
             const { data, error } = await supabase
                 .from('cta_carregamentos')
                 .select('*')
-                .order('entrega', { ascending: false });
+                .order('entrega', { ascending: false }); 
             
             if (error) throw error;
             setCarregamentos(data || []);
@@ -231,7 +231,7 @@ function CtaCarregamentos({ user, showToast }) {
             if (error) throw error;
 
             showToast("Carregamento registrado com sucesso!", "success");
-            setFormData(initialFormState);
+            setFormData(initialFormState); 
             setShowForm(false);
             fetchCarregamentos();
         } catch (err) {
@@ -240,14 +240,12 @@ function CtaCarregamentos({ user, showToast }) {
         setIsLoading(false);
     };
 
-    // NOVO: Função para lidar com a seleção do arquivo
     const handleFileChange = (e) => {
         if (e.target.files && e.target.files[0]) {
             setFile(e.target.files[0]);
         }
     };
 
-    // NOVO: Função para processar e importar a planilha
     const handleImport = () => {
         if (!file) {
             showToast("Por favor, selecione um arquivo para importar.", "error");
@@ -263,20 +261,27 @@ function CtaCarregamentos({ user, showToast }) {
                 const worksheet = workbook.Sheets[sheetName];
                 const json = XLSX.utils.sheet_to_json(worksheet);
 
-                // Mapeia os dados da planilha para o formato do banco de dados
+                // ATUALIZADO: Lógica de mapeamento com conversão de tipos
                 const dataToInsert = json.map(row => {
-                    // Converte a data do Excel se necessário
-                    let deliveryDate = row['Entrega'];
-                    if (deliveryDate instanceof Date) {
-                        // Formata a data para YYYY-MM-DD para o Supabase
-                        deliveryDate = deliveryDate.toISOString().split('T')[0];
+                    let deliveryDate = null;
+                    const excelDate = row['Entrega'];
+                    if (excelDate) {
+                        if (excelDate instanceof Date) {
+                            deliveryDate = excelDate.toISOString().split('T')[0];
+                        } else if (typeof excelDate === 'string' && excelDate.includes('/')) {
+                            const parts = excelDate.split('/');
+                            if(parts.length === 3) { // DD/MM/YYYY -> YYYY-MM-DD
+                               deliveryDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
+                            }
+                        }
                     }
 
                     return {
                         cod_posto: row['Cod Posto'],
-                        volume: row['Volume'],
-                        custo: row['Custo'],
-                        preco_por_litro: row['Preço p/ Litro'],
+                        // Garante que os valores sejam numéricos
+                        volume: parseFloat(row['Volume']) || 0,
+                        custo: parseFloat(row['Custo']) || 0,
+                        preco_por_litro: parseFloat(row['Preço p/ Litro']) || 0,
                         nota_fiscal: row['Nota Fiscal'],
                         fornecedor: row['Fornecedor'],
                         entrega: deliveryDate,
@@ -292,12 +297,16 @@ function CtaCarregamentos({ user, showToast }) {
                 }
                 
                 const { error } = await supabase.from('cta_carregamentos').insert(dataToInsert);
-                if (error) throw error;
+                if (error) {
+                    // Log mais detalhado do erro do Supabase
+                    console.error("Erro do Supabase:", error);
+                    throw error;
+                }
 
                 showToast(`${dataToInsert.length} registros importados com sucesso!`, "success");
                 setFile(null); 
-                document.getElementById('file-input').value = ''; // Limpa o campo do arquivo
-                fetchCarregamentos(); // Atualiza a lista
+                document.getElementById('file-input').value = '';
+                fetchCarregamentos();
             } catch (err) {
                 showToast(`Erro ao processar o arquivo: ${err.message}`, "error");
             }
@@ -322,7 +331,6 @@ function CtaCarregamentos({ user, showToast }) {
             onSubmit: handleFormSubmit, 
             className: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8 p-4 border rounded-lg bg-gray-50" 
         },
-            // ... campos do formulário manual ...
             React.createElement('input', { name: "cod_posto", value: formData.cod_posto, onChange: handleInputChange, placeholder: "Cód. Posto", className: "p-2 border rounded" }),
             React.createElement('input', { name: "volume", type: "number", step: "0.01", value: formData.volume, onChange: handleInputChange, placeholder: "Volume", className: "p-2 border rounded" }),
             React.createElement('input', { name: "custo", type: "number", step: "0.01", value: formData.custo, onChange: handleInputChange, placeholder: "Custo Total", className: "p-2 border rounded" }),
@@ -339,7 +347,6 @@ function CtaCarregamentos({ user, showToast }) {
             )
         ),
         
-        // NOVO: Seção para importação de planilha
         React.createElement('div', { className: "mb-8 p-4 border rounded-lg bg-gray-100 grid grid-cols-1 md:grid-cols-2 gap-4 items-end" },
             React.createElement('div', null,
                 React.createElement('label', { htmlFor: 'file-input', className: "block text-sm font-medium text-gray-700 mb-1" }, "Importar Planilha (.xlsx, .xls, .csv)"),
@@ -358,7 +365,6 @@ function CtaCarregamentos({ user, showToast }) {
             }, isImporting ? 'Importando...' : 'Importar Dados')
         ),
         
-        // Tabela de Resultados
         React.createElement('div', { className: "rounded-lg border border-slate-200 shadow-sm overflow-hidden" },
             React.createElement('table', { className: "w-full text-sm text-left text-slate-600" },
                 React.createElement('thead', { className: "text-xs text-slate-700 uppercase bg-slate-100" },
@@ -385,6 +391,8 @@ function CtaCarregamentos({ user, showToast }) {
         )
     );
 }
+
+/* FIM DO CÓDIGO ATUALIZADO */
 
 /* FIM DO CÓDIGO ATUALIZADO */
 /* FIM DO CÓDIGO ATUALIZADO */
