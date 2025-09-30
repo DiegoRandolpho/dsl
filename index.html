@@ -1139,13 +1139,153 @@ function CadastroFiliais({ user, showToast }) {
 
 /* FIM DO NOVO COMPONENTE */
             // --- ESQUELETO: User Management ---
-            function UserManagement({ user, showToast }) {
-                // TODO: Adicionar lógica completa de CRUD de usuários
-                return React.createElement('div', { className: "bg-white p-6 rounded-xl shadow-lg" },
-                    React.createElement('h2', { className: "text-2xl font-bold text-gray-800 mb-6 text-center" }, "Gerenciamento de Usuários"),
-                    React.createElement('p', { className: "text-center" }, "Formulário de cadastro e tabela de usuários (em desenvolvimento).")
-                );
+            /* INÍCIO DO CÓDIGO ATUALIZADO PARA UserManagement */
+
+function UserManagement({ user, showToast }) {
+    const [usersList, setUsersList] = React.useState([]);
+    const [isLoading, setIsLoading] = React.useState(false);
+    const [showForm, setShowForm] = React.useState(false);
+
+    const initialFormState = { nome: '', usuario: '', senha: '', nivel_permissao: 'user' };
+    const [formData, setFormData] = React.useState(initialFormState);
+    
+    const [showConfirmModal, setShowConfirmModal] = React.useState(false);
+    const [userToDelete, setUserToDelete] = React.useState(null);
+    const permissionLevels = ['administrador', 'user'];
+
+    const getRoleBadge = (role) => {
+        const baseClasses = "inline-flex items-center py-1 px-3 rounded-full text-xs font-medium capitalize";
+        switch (role) {
+            case 'administrador': return React.createElement('span', { className: `bg-red-100 text-red-800 ${baseClasses}` }, role);
+            case 'user': default: return React.createElement('span', { className: `bg-gray-100 text-gray-800 ${baseClasses}` }, role);
+        }
+    };
+
+    const fetchUsers = React.useCallback(async () => {
+        setIsLoading(true);
+        try {
+            const { data, error } = await supabase.from('usuarios').select('*').order('data_criacao', { ascending: false });
+            if (error) throw error;
+            setUsersList(data || []);
+        } catch (e) {
+            showToast("Erro ao carregar usuários.", "error");
+        }
+        setIsLoading(false);
+    }, [showToast]);
+
+    React.useEffect(() => {
+        fetchUsers();
+    }, [fetchUsers]);
+    
+    const handleInputChange = (e) => {
+        setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+    };
+
+    const handleAddUser = async (e) => {
+        e.preventDefault();
+        if (!formData.nome.trim() || !formData.usuario.trim() || !formData.senha.trim()) { 
+            showToast("Preencha todos os campos obrigatórios.", "error");
+            return; 
+        }
+        setIsLoading(true);
+        try {
+            const { data: existing } = await supabase.from('usuarios').select('usuario').eq('usuario', formData.usuario.trim().toLowerCase());
+            if (existing && existing.length > 0) { 
+                showToast("Nome de usuário já existe.", "error");
+                setIsLoading(false); 
+                return; 
             }
+            const { error } = await supabase.from('usuarios').insert([{ 
+                nome: formData.nome.trim(), 
+                usuario: formData.usuario.trim().toLowerCase(), 
+                senha: formData.senha, // Senha não é convertida para minúsculas
+                nivel_permissao: formData.nivel_permissao,
+                usuario_criacao: user.nome
+            }]);
+            if (error) throw error;
+
+            showToast("Usuário adicionado com sucesso!", "success");
+            setFormData(initialFormState);
+            setShowForm(false);
+            fetchUsers();
+        } catch(e) {
+            showToast("Erro ao adicionar usuário.", "error");
+        }
+        setIsLoading(false);
+    };
+
+    const confirmDeleteUser = (user) => { 
+        setUserToDelete(user); 
+        setShowConfirmModal(true); 
+    };
+
+    const handleDeleteUser = async () => {
+        if (!userToDelete) return;
+        setIsLoading(true);
+        try {
+            const { error } = await supabase.from('usuarios').delete().eq('id', userToDelete.id);
+            if (error) throw error;
+            showToast("Usuário excluído com sucesso!", "success");
+            fetchUsers();
+        } catch(e) {
+            showToast("Erro ao excluir usuário.", "error");
+        }
+        setIsLoading(false);
+        setShowConfirmModal(false);
+        setUserToDelete(null);
+    };
+
+    return React.createElement('div', { className: "bg-white p-6 rounded-xl shadow-lg" },
+        React.createElement('h2', { className: "text-2xl font-bold text-gray-800 mb-6 text-center" }, "Gerenciamento de Usuários"),
+        
+        !showForm && React.createElement('div', { className: 'flex justify-center mb-6' },
+            React.createElement('button', {
+                onClick: () => setShowForm(true),
+                className: "p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center"
+            }, React.createElement(LucideIcon, { name: 'PlusCircle', className: 'mr-2 h-5 w-5' }), "Novo Usuário")
+        ),
+
+        showForm && React.createElement('form', { onSubmit: handleAddUser, className: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8 p-4 border rounded-lg bg-gray-50" },
+            React.createElement('input', { name: "nome", value: formData.nome, onChange: handleInputChange, placeholder: "Nome Completo*", className: "p-2 border rounded" }),
+            React.createElement('input', { name: "usuario", value: formData.usuario, onChange: handleInputChange, placeholder: "Usuário (para login)*", className: "p-2 border rounded" }),
+            React.createElement('input', { name: "senha", type: "password", value: formData.senha, onChange: handleInputChange, placeholder: "Senha*", className: "p-2 border rounded" }),
+            React.createElement('select', { name: "nivel_permissao", value: formData.nivel_permissao, onChange: handleInputChange, className: "p-2 border rounded" }, 
+                permissionLevels.map(r => React.createElement('option', { key: r, value: r }, r.charAt(0).toUpperCase() + r.slice(1)))
+            ),
+            React.createElement('div', { className: "lg:col-span-4 flex justify-end gap-4" },
+                React.createElement('button', { type: "button", onClick: () => setShowForm(false), className: "py-2 px-4 bg-gray-300 rounded-lg" }, "Cancelar"),
+                React.createElement('button', { type: "submit", className: "py-2 px-4 bg-blue-600 text-white rounded-lg", disabled: isLoading }, isLoading ? 'Salvando...' : 'Salvar')
+            )
+        ),
+        
+        React.createElement('div', { className: "rounded-lg border border-slate-200 shadow-sm overflow-hidden" },
+            React.createElement('table', { className: "w-full text-sm text-left text-slate-600" },
+                React.createElement('thead', { className: "text-xs text-slate-700 uppercase bg-slate-100" }, 
+                    React.createElement('tr', null, 
+                        ["Usuário", "Nome Completo", "Nível de Permissão", "Data Criação", "Ações"].map(h => React.createElement('th',{key:h, className:"px-6 py-4 font-semibold border-b border-r border-slate-200 last:border-r-0"},h))
+                    )
+                ),
+                React.createElement('tbody', null, 
+                    isLoading ? React.createElement('tr', null, React.createElement('td', { colSpan: 5, className: "p-4 text-center" }, "Carregando...")) :
+                    usersList.map(u => React.createElement('tr', { key: u.id, className: "hover:bg-blue-50 even:bg-slate-50" },
+                        React.createElement('td', {className:"px-6 py-4 border-r border-slate-200"}, React.createElement('span', { className: 'font-medium text-slate-800' }, u.usuario)),
+                        React.createElement('td', {className:"px-6 py-4 border-r border-slate-200"}, u.nome),
+                        React.createElement('td', {className:"px-6 py-4 border-r border-slate-200"}, getRoleBadge(u.nivel_permissao)),
+                        React.createElement('td', {className:"px-6 py-4 border-r border-slate-200"}, new Date(u.data_criacao).toLocaleDateString('pt-BR')),
+                        React.createElement('td', {className:"px-6 py-4 text-center"}, 
+                            React.createElement('button', { onClick: () => confirmDeleteUser(u), className: "text-gray-400 hover:text-red-600 transition-colors" }, 
+                                React.createElement(LucideIcon, {name: 'Trash2', className: 'h-5 w-5'})
+                            )
+                        )
+                    ))
+                )
+            )
+        ),
+        showConfirmModal && React.createElement(ConfirmationModal, { message: `Deseja realmente excluir o usuário "${userToDelete?.usuario}"?`, onConfirm: handleDeleteUser, onCancel: () => setShowConfirmModal(false) })
+    );
+}
+
+/* FIM DO CÓDIGO ATUALIZADO */
 
             // ================================================================
             // 4. COMPONENTE PRINCIPAL (App)
