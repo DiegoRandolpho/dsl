@@ -154,15 +154,15 @@
             
            /* INÍCIO DO CÓDIGO ATUALIZADO PARA TicketAbastecimentos */
 
+/* INÍCIO DO CÓDIGO ATUALIZADO PARA TicketAbastecimentos */
+
 function TicketAbastecimentos({ user, showToast }) {
     const [abastecimentos, setAbastecimentos] = React.useState([]);
     const [isLoading, setIsLoading] = React.useState(false);
     
-    // Estados para importação
     const [file, setFile] = React.useState(null);
     const [isImporting, setIsImporting] = React.useState(false);
 
-    // Estados para os filtros de busca
     const [filters, setFilters] = React.useState({ placa: '', data: '', cidade: '', estabelecimento: '' });
     const [hasSearched, setHasSearched] = React.useState(false);
 
@@ -183,12 +183,10 @@ function TicketAbastecimentos({ user, showToast }) {
         try {
             let query = supabase.from('ticket_abastecimentos').select('*');
 
-            // Aplica filtros dinamicamente
             if (filters.placa) query = query.ilike('placa', `%${filters.placa.trim()}%`);
             if (filters.cidade) query = query.ilike('cidade', `%${filters.cidade.trim()}%`);
             if (filters.estabelecimento) query = query.ilike('estabelecimento', `%${filters.estabelecimento.trim()}%`);
             if (filters.data) {
-                // Filtra pelo dia inteiro da data selecionada
                 const startDate = `${filters.data}T00:00:00`;
                 const endDate = `${filters.data}T23:59:59`;
                 query = query.gte('data_transacao', startDate).lte('data_transacao', endDate);
@@ -234,7 +232,8 @@ function TicketAbastecimentos({ user, showToast }) {
                     cidade: row['Cidade'],
                     uf: row['UF'],
                     motorista: row['Motorista'],
-                    cartao: row['Cartão'],
+                    // CORRIGIDO: Campo 'cartao' alterado para 'numero_cartao'
+                    numero_cartao: row['Cartão'],
                     usuario_criacao: user.nome,
                     data_criacao: new Date().toISOString(),
                 }));
@@ -245,7 +244,6 @@ function TicketAbastecimentos({ user, showToast }) {
                     return;
                 }
                 
-                // Insere os dados em lotes para evitar sobrecarga (opcional, mas bom para arquivos grandes)
                 const { error } = await supabase.from('ticket_abastecimentos').insert(dataToInsert, { returning: 'minimal' });
 
                 if (error) {
@@ -256,7 +254,6 @@ function TicketAbastecimentos({ user, showToast }) {
                 showToast(`${dataToInsert.length} registros importados com sucesso!`, "success");
                 setFile(null); 
                 document.getElementById('file-input-ticket').value = '';
-                // Limpa a busca para evitar confusão, incentivando uma nova busca
                 setHasSearched(false);
                 setAbastecimentos([]);
 
@@ -325,6 +322,8 @@ function TicketAbastecimentos({ user, showToast }) {
         )
     );
 }
+
+/* FIM DO CÓDIGO ATUALIZADO */
 
 /* FIM DO CÓDIGO ATUALIZADO */
             // --- ESQUELETO: CTA Carregamentos ---
