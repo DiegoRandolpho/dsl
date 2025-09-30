@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Novo Sistema</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #e0e0e0; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb { background: #bdbdbd; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #a0a0a0; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script type="text/javascript">
+        // Definição dos ícones Lucide que usaremos
+        const icons = {
+            LayoutDashboard: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>',
+            Ticket: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a3 3 0 0 1 0 6v1a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-1a3 3 0 0 1 0-6V8a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/></svg>',
+            Fuel: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" x2="15" y1="22" y2="22"/><line x1="4" x2="14" y1="9" y2="9"/><path d="M14 22V4a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v18"/><path d="M14 13h2a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2h-2v-4Z"/></svg>',
+            Ship: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 21c.6.5 1.2 1 2.5 1 1.6 0 2.5-.5 5-1 2.5-.5 3.4 0 5 1 1.6.5 2.5 0 5-1 2.5-1 3-1.5 3-2 0 0 0-6.5-2-8l-2-2-2.5 1-1.5-2-3-2-3 2-1.5 2-2.5-1-2 2c-2 1.5-2 8-2 8Z"/><path d="M2 15h20"/><path d="M8 21V9l2-3 2 3v12"/><path d="m18 21-1-3-1 3h2Z"/></svg>',
+            Beaker: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 3h15"/><path d="M6 3v16a2 2 0 0 0 2 2h8a2 2 0 0 0 2-16V3"/><path d="M6 14h12"/></svg>',
+            Users: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+            LogOut: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="17 16 22 12 17 8"/><line x1="22" x2="11" y1="12" y2="12"/></svg>',
+            Menu: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg>',
+            ChevronUp: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-up"><path d="m18 15-6-6-6 6"/></svg>',
+            ChevronDown: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down"><path d="m6 9 6 6 6-6"/></svg>',
+            Trash2: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-trash-2"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>',
+            PlusCircle: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus-circle"><circle cx="12" cy="12" r="10"/><path d="M8 12h8"/><path d="M12 8v8"/></svg>',
+        };
+
+        window.onload = function() {
+            // ================================================================
+            // 1. CONFIGURAÇÃO
+            // ================================================================
+            const SUPABASE_URL = 'SUA_URL_SUPABASE'; // <-- SUBSTITUA AQUI
+            const SUPABASE_ANON_KEY = 'SUA_ANON_KEY'; // <-- SUBSTITUA AQUI
+            let supabase;
+
+            // ================================================================
+            // 2. COMPONENTES AUXILIARES (Helpers)
+            // ================================================================
+            function LucideIcon({ name, className }) {
+                return React.createElement('span', {
+                    className: className,
+                    dangerouslySetInnerHTML: { __html: icons[name] || '' }
+                });
+            }
+
+            function Toast({ message, type, onClose }) {
+                const bgColor = type === 'success' ? 'bg-green-500' : 'bg-red-500';
+                React.useEffect(() => {
+                    const timer = setTimeout(() => onClose(), 3000);
+                    return () => clearTimeout(timer);
+                }, [onClose]);
+                return React.createElement('div', { className: `fixed bottom-4 right-4 ${bgColor} text-white p-4 rounded-lg shadow-lg flex items-center z-50` }, message);
+            }
+            
+            function ConfirmationModal({ message, onConfirm, onCancel }) {
+                return React.createElement('div', { className: "fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50" },
+                    React.createElement('div', { className: "bg-white p-8 rounded-xl shadow-2xl max-w-sm w-full text-center" },
+                        React.createElement('p', { className: "text-lg font-semibold text-gray-800 mb-6" }, message),
+                        React.createElement('div', { className: "flex justify-center space-x-4" },
+                            React.createElement('button', { onClick: onConfirm, className: "px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition" }, "Confirmar"),
+                            React.createElement('button', { onClick: onCancel, className: "px-6 py-3 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition" }, "Cancelar")
+                        )
+                    )
+                );
+            }
+
+            // ================================================================
+            // 3. COMPONENTES DE PÁGINA (Módulos)
+            // ================================================================
+
+            // --- TELA DE LOGIN (Adaptada do TERSYS) ---
+            function LoginPage({ onLogin }) {
+                const [nome, setNome] = React.useState('');
+                const [senha, setSenha] = React.useState('');
+                const [error, setError] = React.useState('');
+                const [isLoggingIn, setIsLoggingIn] = React.useState(false);
+
+                const handleLogin = async (e) => {
+                    e.preventDefault();
+                    setIsLoggingIn(true);
+                    setError('');
+                    try {
+                        const { data, error: fetchError } = await supabase
+                            .from('usuarios') // Tabela 'usuarios'
+                            .select('*')
+                            .eq('nome', nome.toLowerCase()) // Campo 'nome', em minúsculas
+                            .eq('senha', senha) // Campo 'senha'
+                            .single();
+                        
+                        if (fetchError || !data) {
+                            setError('Usuário ou senha inválidos.');
+                        } else {
+                            // Guarda o usuário inteiro na sessão
+                            onLogin(data); 
+                        }
+                    } catch (e) {
+                        setError("Erro ao autenticar. Tente novamente.");
+                    }
+                    setIsLoggingIn(false);
+                };
+
+                return React.createElement('div', { className: "min-h-screen flex items-center justify-center bg-gray-100" },
+                    React.createElement('div', { className: "max-w-md w-full bg-white p-8 rounded-xl shadow-lg" },
+                        React.createElement('h2', { className: "text-3xl font-bold text-center text-gray-800 mb-6" }, "Bem-vindo"),
+                        error && React.createElement('div', { className: "bg-red-100 text-red-700 p-3 rounded text-center mb-4" }, error),
+                        React.createElement('form', { onSubmit: handleLogin, className: "space-y-6" },
+                            React.createElement('div', null,
+                                React.createElement('label', { htmlFor: "username", className: "block text-sm font-medium text-gray-700" }, "Usuário"),
+                                React.createElement('input', { type: "text", id: "username", value: nome, onChange: (e) => setNome(e.target.value), className: "mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500", placeholder: "Seu usuário", required: true, disabled: isLoggingIn })
+                            ),
+                            React.createElement('div', null,
+                                React.createElement('label', { htmlFor: "password", className: "block text-sm font-medium text-gray-700" }, "Senha"),
+                                React.createElement('input', { type: "password", id: "password", value: senha, onChange: (e) => setSenha(e.target.value), className: "mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500", placeholder: "Sua senha", required: true, disabled: isLoggingIn })
+                            ),
+                            React.createElement('button', { type: "submit", className: "w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50", disabled: isLoggingIn }, isLoggingIn ? 'Entrando...' : 'Entrar')
+                        )
+                    )
+                );
+            }
+
+            // --- ESQUELETO: Dashboard ---
+            function Dashboard({ user, showToast }) {
+                // TODO: Adicionar lógica para buscar últimos abastecimentos
+                return React.createElement('div', { className: "bg-white p-6 rounded-xl shadow-lg" },
+                    React.createElement('h2', { className: "text-2xl font-bold text-gray-800 mb-4" }, `Olá, ${user.nome}!`),
+                    React.createElement('p', null, "Dashboard com os últimos abastecimentos de cada origem (em desenvolvimento).")
+                );
+            }
+            
+            // --- ESQUELETO: Ticket Abastecimentos ---
+            function TicketAbastecimentos({ user, showToast }) {
+                // TODO: Adicionar estados para filtros e dados
+                return React.createElement('div', { className: "bg-white p-6 rounded-xl shadow-lg" },
+                    React.createElement('h2', { className: "text-2xl font-bold text-gray-800 mb-6 text-center" }, "Ticket Abastecimentos"),
+                    React.createElement('p', { className: "text-center" }, "Filtros e tabela de resultados (em desenvolvimento).")
+                );
+            }
+
+            // --- ESQUELETO: CTA Abastecimentos ---
+            function CtaAbastecimentos({ user, showToast }) {
+                 // TODO: Adicionar estados para dados e formulário
+                return React.createElement('div', { className: "bg-white p-6 rounded-xl shadow-lg" },
+                    React.createElement('h2', { className: "text-2xl font-bold text-gray-800 mb-6 text-center" }, "CTA Abastecimentos"),
+                    React.createElement('p', { className: "text-center" }, "Tabela de resultados e formulário de cadastro (em desenvolvimento).")
+                );
+            }
+
+            // --- ESQUELETO: CTA Carregamentos ---
+            function CtaCarregamentos({ user, showToast }) {
+                 // TODO: Adicionar estados para dados e formulário
+                return React.createElement('div', { className: "bg-white p-6 rounded-xl shadow-lg" },
+                    React.createElement('h2', { className: "text-2xl font-bold text-gray-800 mb-6 text-center" }, "CTA Carregamentos"),
+                    React.createElement('p', { className: "text-center" }, "Tabela de resultados e formulário de cadastro (em desenvolvimento).")
+                );
+            }
+
+            // --- ESQUELETO: Aferições ---
+            function Afericoes({ user, showToast }) {
+                // TODO: Adicionar estados e lógica para visualização
+                return React.createElement('div', { className: "bg-white p-6 rounded-xl shadow-lg" },
+                    React.createElement('h2', { className: "text-2xl font-bold text-gray-800 mb-6 text-center" }, "Aferições de Tanques"),
+                    React.createElement('p', { className: "text-center" }, "Tabela de resultados e comparativo visual (em desenvolvimento).")
+                );
+            }
+
+            // --- ESQUELETO: User Management ---
+            function UserManagement({ user, showToast }) {
+                // TODO: Adicionar lógica completa de CRUD de usuários
+                return React.createElement('div', { className: "bg-white p-6 rounded-xl shadow-lg" },
+                    React.createElement('h2', { className: "text-2xl font-bold text-gray-800 mb-6 text-center" }, "Gerenciamento de Usuários"),
+                    React.createElement('p', { className: "text-center" }, "Formulário de cadastro e tabela de usuários (em desenvolvimento).")
+                );
+            }
+
+            // ================================================================
+            // 4. COMPONENTE PRINCIPAL (App)
+            // ================================================================
+            function App() {
+                const [user, setUser] = React.useState(null);
+                const [currentPage, setCurrentPage] = React.useState('dashboard');
+                const [toast, setToast] = React.useState({ show: false, message: '', type: '' });
+                const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
+
+                const handleLogin = (userData) => {
+                    setUser(userData);
+                    setCurrentPage('dashboard');
+                };
+
+                const handleLogout = () => {
+                    setUser(null);
+                };
+
+                const showToast = (message, type = 'success') => setToast({ show: true, message, type });
+                const closeToast = () => setToast({ show: false, message: '', type: '' });
+
+                const renderPage = () => {
+                    switch (currentPage) {
+                        case 'dashboard': return React.createElement(Dashboard, { user, showToast });
+                        case 'ticketAbastecimentos': return React.createElement(TicketAbastecimentos, { user, showToast });
+                        case 'ctaAbastecimentos': return React.createElement(CtaAbastecimentos, { user, showToast });
+                        case 'ctaCarregamentos': return React.createElement(CtaCarregamentos, { user, showToast });
+                        case 'afericoes': return React.createElement(Afericoes, { user, showToast });
+                        case 'userManagement': return React.createElement(UserManagement, { user, showToast });
+                        default: return React.createElement(Dashboard, { user, showToast });
+                    }
+                };
+                
+                if (!user) {
+                    return React.createElement(LoginPage, { onLogin: handleLogin });
+                }
+
+                const MenuItem = ({ page, icon, text }) => {
+                   const isActive = currentPage === page;
+                   return React.createElement('li', null,
+                        React.createElement('button', {
+                           onClick: () => { setCurrentPage(page); setIsSidebarOpen(false); },
+                           className: `flex items-center w-full px-4 py-2 rounded-lg transition-colors ${isActive ? 'bg-blue-600 text-white' : 'hover:bg-gray-700 text-gray-300'}`
+                        },
+                           React.createElement(LucideIcon, { name: icon, className: 'h-5 w-5 mr-3' }),
+                           text
+                       )
+                    );
+                };
+
+                return (
+                    React.createElement('div', { className: "flex min-h-screen bg-gray-100" },
+                        // Sidebar
+                        React.createElement('aside', { className: `fixed inset-y-0 left-0 bg-gray-800 text-white p-4 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:relative md:translate-x-0 transition-all duration-300 z-30 w-64` },
+                            React.createElement('h1', { className: "text-2xl font-bold mb-8 text-center" }, "Meu Site"),
+                            React.createElement('nav', null,
+                                React.createElement('ul', { className: "space-y-2" },
+                                    React.createElement(MenuItem, { page: 'dashboard', icon: 'LayoutDashboard', text: 'Dashboard' }),
+                                    React.createElement(MenuItem, { page: 'ticketAbastecimentos', icon: 'Ticket', text: 'Ticket Abastecimentos' }),
+                                    React.createElement(MenuItem, { page: 'ctaAbastecimentos', icon: 'Fuel', text: 'CTA Abastecimentos' }),
+                                    React.createElement(MenuItem, { page: 'ctaCarregamentos', icon: 'Ship', text: 'CTA Carregamentos' }),
+                                    React.createElement(MenuItem, { page: 'afericoes', icon: 'Beaker', text: 'Aferições' }),
+                                    user.nivel_permissao === 'admin' && React.createElement(MenuItem, { page: 'userManagement', icon: 'Users', text: 'Usuários' })
+                                )
+                            ),
+                            React.createElement('button', { onClick: handleLogout, className: "w-full flex items-center justify-center p-3 rounded-lg text-red-400 hover:bg-gray-700 mt-auto" },
+                                React.createElement(LucideIcon, { name: "LogOut", className: 'w-6 h-6 mr-3' }),
+                                'Sair'
+                            )
+                        ),
+                        // Conteúdo Principal
+                        React.createElement('main', { className: "flex-1 p-4 md:p-8 flex flex-col" },
+                            React.createElement('header', { className: "w-full bg-white p-4 rounded-xl shadow-lg mb-8 flex justify-between items-center" },
+                                React.createElement('button', { className: "md:hidden text-gray-700 p-2", onClick: () => setIsSidebarOpen(true) }, React.createElement(LucideIcon, { name: "Menu" })),
+                                React.createElement('div', { className: "text-right text-sm text-gray-600" },
+                                    React.createElement('p', null, "Usuário: ", React.createElement('strong', null, user.nome)),
+                                    React.createElement('p', {className: "capitalize"}, "Permissão: ", React.createElement('strong', null, user.nivel_permissao))
+                                )
+                            ),
+                            React.createElement('div', { className: "flex-grow" }, renderPage()),
+                            toast.show && React.createElement(Toast, { message: toast.message, type: toast.type, onClose: closeToast })
+                        )
+                    )
+                );
+            }
+
+            // ================================================================
+            // 5. INICIALIZAÇÃO
+            // ================================================================
+            const initializeSupabaseAndRenderApp = () => {
+                try {
+                    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                    ReactDOM.render(React.createElement(App), document.getElementById('root'));
+                } catch (e) {
+                    console.error("Erro ao inicializar o cliente Supabase:", e);
+                }
+            };
+
+            const supabaseScript = document.createElement('script');
+            supabaseScript.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.43.0/dist/umd/supabase.min.js";
+            supabaseScript.onload = initializeSupabaseAndRenderApp;
+            document.head.appendChild(supabaseScript);
+        }
+    </script>
+</body>
+</html>
