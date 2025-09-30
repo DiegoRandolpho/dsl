@@ -152,7 +152,7 @@
                 );
             }
             
-  /* INÍCIO DO CÓDIGO ATUALIZADO PARA TicketAbastecimentos */
+/* INÍCIO DO CÓDIGO ATUALIZADO PARA TicketAbastecimentos */
 
 function TicketAbastecimentos({ user, showToast }) {
     const [abastecimentos, setAbastecimentos] = React.useState([]);
@@ -220,13 +220,12 @@ function TicketAbastecimentos({ user, showToast }) {
                 const worksheet = workbook.Sheets[sheetName];
                 const json = XLSX.utils.sheet_to_json(worksheet);
 
-                const dataToInsert = json.map(row => {
+                // CORREÇÃO: Adicionado .slice(0, -1) para ignorar a última linha (Total) da planilha
+                const dataToInsert = json.slice(0, -1).map(row => {
                     const transacaoDate = row['DATA TRANSACAO'];
-
                     return {
                         codigo_transacao: row['CODIGO TRANSACAO'],
                         servico: row['SERVICO'],
-                        // CORREÇÃO: Converte o objeto de data para uma string no formato ISO
                         data_transacao: transacaoDate instanceof Date ? transacaoDate.toISOString() : null,
                         placa: row['PLACA'],
                         tipo_combustivel: row['TIPO COMBUSTIVEL'],
@@ -243,8 +242,9 @@ function TicketAbastecimentos({ user, showToast }) {
                     };
                 });
 
+
                 if (dataToInsert.length === 0) {
-                    showToast("Nenhum dado válido encontrado na planilha.", "info");
+                    showToast("Nenhum dado válido encontrado na planilha (ignorando a linha de total).", "info");
                     setIsImporting(false);
                     return;
                 }
@@ -330,14 +330,6 @@ function TicketAbastecimentos({ user, showToast }) {
         )
     );
 }
-
-/* FIM DO CÓDIGO ATUALIZADO */
-
-/* INÍCIO DO CÓDIGO ATUALIZADO PARA CtaCarregamentos */
-
-/* INÍCIO DO CÓDIGO ATUALIZADO PARA CtaCarregamentos */
-
-/* INÍCIO DO CÓDIGO ATUALIZADO PARA CtaCarregamentos com Busca */
 
 function CtaCarregamentos({ user, showToast }) {
     const [carregamentos, setCarregamentos] = React.useState([]);
