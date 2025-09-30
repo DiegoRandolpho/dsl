@@ -493,33 +493,55 @@ function CtaCarregamentos({ user, showToast }) {
             // ================================================================
             /* INÍCIO DO CÓDIGO ATUALIZADO PARA A FUNÇÃO App */
 
+/* INÍCIO DO CÓDIGO ATUALIZADO PARA A FUNÇÃO App */
+
 function App() {
-    const [user, setUser] = React.useState(null);
+    const [user, setUser] = React.useState(() => {
+        const savedUser = localStorage.getItem('userSession');
+        return savedUser ? JSON.parse(savedUser) : null;
+    });
+
     const [currentPage, setCurrentPage] = React.useState('dashboard');
     const [toast, setToast] = React.useState({ show: false, message: '', type: '' });
     const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
-    
-    // NOVO: Estado para controlar qual menu está aberto
     const [openMenu, setOpenMenu] = React.useState('');
 
+    // NOVO: Estado para controlar se a sidebar está recolhida
+    const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(false);
+
     const handleLogin = (userData) => {
+        localStorage.setItem('userSession', JSON.stringify(userData));
         setUser(userData);
         setCurrentPage('dashboard');
     };
 
     const handleLogout = () => {
+        localStorage.removeItem('userSession');
         setUser(null);
     };
 
     const showToast = (message, type = 'success') => setToast({ show: true, message, type });
     const closeToast = () => setToast({ show: false, message: '', type: '' });
 
-    // NOVO: Função para abrir/fechar os submenus
+    // ATUALIZADO: Função de menu para expandir a sidebar se estiver recolhida
     const toggleMenu = (menu) => {
-        setOpenMenu(openMenu === menu ? '' : menu);
+        if (isSidebarCollapsed) {
+            setIsSidebarCollapsed(false);
+        } else {
+            setOpenMenu(openMenu === menu ? '' : menu);
+        }
+    };
+
+    // NOVO: Função para recolher/expandir a sidebar
+    const toggleSidebarCollapse = () => {
+        setIsSidebarCollapsed(!isSidebarCollapsed);
+        if (!isSidebarCollapsed) {
+            setOpenMenu(''); // Fecha submenus ao recolher
+        }
     };
 
     const renderPage = () => {
+        // ... (a função renderPage continua a mesma)
         switch (currentPage) {
             case 'dashboard': return React.createElement(Dashboard, { user, showToast });
             case 'ticketAbastecimentos': return React.createElement(TicketAbastecimentos, { user, showToast });
@@ -535,69 +557,88 @@ function App() {
         return React.createElement(LoginPage, { onLogin: handleLogin });
     }
 
+    // ATUALIZADO: Componentes de menu agora reagem ao estado 'isSidebarCollapsed'
     const MenuItem = ({ page, icon, text }) => {
-        const isActive = currentPage === page;
-        return React.createElement('li', null,
+       const isActive = currentPage === page;
+       return React.createElement('li', null,
             React.createElement('button', {
-                onClick: () => { setCurrentPage(page); setIsSidebarOpen(false); },
-                className: `flex items-center w-full px-4 py-2 rounded-lg transition-colors ${isActive ? 'bg-blue-600 text-white' : 'hover:bg-gray-700 text-gray-300'}`
+               onClick: () => { setCurrentPage(page); setIsSidebarOpen(false); },
+               className: `flex items-center w-full px-4 py-2 rounded-lg transition-colors ${isSidebarCollapsed ? 'justify-center' : ''} ${isActive ? 'bg-blue-600 text-white' : 'hover:bg-gray-700 text-gray-300'}`
             },
-                React.createElement(LucideIcon, { name: icon, className: 'h-5 w-5 mr-3' }),
-                text
-            )
+               React.createElement(LucideIcon, { name: icon, className: `h-5 w-5 ${!isSidebarCollapsed && 'mr-3'}` }),
+               !isSidebarCollapsed && text
+           )
         );
     };
     
-    // NOVO: Componente para criar uma categoria de menu com submenu
     const MenuCategory = ({ title, icon, children, menuKey }) => {
         const isOpen = openMenu === menuKey;
         return (
             React.createElement('li', { className: "mb-2" },
                 React.createElement('button', {
                     onClick: () => toggleMenu(menuKey),
-                    className: `flex items-center justify-between w-full px-4 py-2 rounded-lg transition-colors ${isOpen ? 'bg-gray-700' : 'hover:bg-gray-700'} text-gray-200`
+                    className: `flex items-center w-full px-4 py-2 rounded-lg transition-colors ${isSidebarCollapsed ? 'justify-center' : 'justify-between'} ${isOpen && !isSidebarCollapsed ? 'bg-gray-700' : 'hover:bg-gray-700'} text-gray-200`
                 },
                     React.createElement('span', {className: 'flex items-center'},
-                        React.createElement(LucideIcon, { name: icon, className: `h-5 w-5 mr-3` }),
-                        title
+                        React.createElement(LucideIcon, { name: icon, className: `h-5 w-5 ${!isSidebarCollapsed && 'mr-3'}` }),
+                        !isSidebarCollapsed && title
                     ),
-                    React.createElement(LucideIcon, { name: isOpen ? "ChevronUp" : "ChevronDown", className: "h-5 w-5" })
+                    !isSidebarCollapsed && React.createElement(LucideIcon, { name: isOpen ? "ChevronUp" : "ChevronDown", className: "h-5 w-5" })
                 ),
-                isOpen && React.createElement('ul', { className: "ml-6 mt-2 space-y-2" }, children)
+                !isSidebarCollapsed && isOpen && React.createElement('ul', { className: "ml-6 mt-2 space-y-2" }, children)
             )
         );
     };
 
     return (
         React.createElement('div', { className: "flex min-h-screen bg-gray-100" },
-            // Sidebar
-            React.createElement('aside', { className: `fixed inset-y-0 left-0 bg-gray-800 text-white p-4 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:relative md:translate-x-0 transition-all duration-300 z-30 w-64` },
-                React.createElement('h1', { className: "text-2xl font-bold mb-8 text-center" }, "Meu Site"),
+            // ATUALIZADO: Sidebar com classes e lógica para recolher/expandir
+            React.createElement('aside', { className: `fixed inset-y-0 left-0 bg-gray-800 text-white p-4 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:relative md:translate-x-0 transition-all duration-300 z-30 flex flex-col ${isSidebarCollapsed ? 'w-20' : 'w-64'}` },
+                // ATUALIZADO: Seção do logo no lugar do texto 'Meu Site'
+                React.createElement('div', { className: `flex items-center mb-8 ${isSidebarCollapsed ? 'justify-center' : 'justify-between'}` },
+                    !isSidebarCollapsed && React.createElement('img', { 
+                        src: "https://ikypygpbdmoxozfmwewr.supabase.co/storage/v1/object/sign/logo/LOGO_TERSYS-removebg-preview%20(1)%20(1).png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9lMGJiMDk5Zi1jZmE5LTQ5Y2UtYjUwNy0wZmE2ZWZkYWYxOTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJsb2dvL0xPR09fVEVSU1lTLXJlbW92ZWJnLXByZXZpZXcgKDEpICgxKS5wbmciLCJpYXQiOjE3NTkyMzU4NTYsImV4cCI6MjA3NDU5NTg1Nn0.R8XPKzBUjrjR3kcJijIvDaCGpGMlvyMKA6lsqiSOcEQ", 
+                        alt: "Logo", 
+                        className: "h-12 w-auto cursor-pointer", 
+                        onClick: () => setCurrentPage('dashboard') 
+                    }),
+                    React.createElement('button', { onClick: () => setIsSidebarOpen(false), className: "md:hidden text-white" }, React.createElement(LucideIcon, { name: "X" }))
+                ),
                 
-                // ATUALIZADO: Estrutura de navegação com a nova categoria "Importação"
-                React.createElement('nav', null,
+                React.createElement('nav', { className: "flex-grow" },
                     React.createElement('ul', { className: "space-y-2" },
                         React.createElement(MenuItem, { page: 'dashboard', icon: 'LayoutDashboard', text: 'Dashboard' }),
-                        
                         React.createElement(MenuCategory, { title: "Importação", icon: "PlusCircle", menuKey: "importacao" },
                             React.createElement(MenuItem, { page: 'ticketAbastecimentos', icon: 'Ticket', text: 'Ticket Abastecimentos' }),
                             React.createElement(MenuItem, { page: 'ctaAbastecimentos', icon: 'Fuel', text: 'CTA Abastecimentos' }),
                             React.createElement(MenuItem, { page: 'ctaCarregamentos', icon: 'Ship', text: 'CTA Carregamentos' })
                         ),
-                        
                         React.createElement(MenuItem, { page: 'afericoes', icon: 'Beaker', text: 'Aferições' }),
-                        
                         user.nivel_permissao === 'admin' && React.createElement(MenuItem, { page: 'userManagement', icon: 'Users', text: 'Usuários' })
                     )
                 ),
-                
-                React.createElement('button', { onClick: handleLogout, className: "w-full flex items-center justify-center p-3 rounded-lg text-red-400 hover:bg-gray-700 mt-auto" },
-                    React.createElement(LucideIcon, { name: "LogOut", className: 'w-6 h-6 mr-3' }),
-                    'Sair'
+
+                // NOVO: Div com os botões de controle da sidebar (recolher e sair)
+                React.createElement('div', {className: 'mt-auto pt-4 border-t border-gray-700'},
+                    React.createElement('button', { 
+                        onClick: toggleSidebarCollapse, 
+                        className: "w-full flex items-center p-3 rounded-lg text-gray-400 hover:bg-gray-700 justify-center mb-2" 
+                    },
+                        React.createElement(LucideIcon, { name: isSidebarCollapsed ? "ChevronsRight" : "ChevronsLeft", className: "w-6 h-6" })
+                    ),
+                    React.createElement('button', { 
+                        onClick: handleLogout, 
+                        className: `w-full flex items-center p-3 rounded-lg text-red-400 hover:bg-gray-700 ${isSidebarCollapsed ? 'justify-center' : ''}` 
+                    },
+                        React.createElement(LucideIcon, { name: "LogOut", className: `w-6 h-6 ${!isSidebarCollapsed && 'mr-3'}` }),
+                        !isSidebarCollapsed && 'Sair'
+                    )
                 )
             ),
+            
             // Conteúdo Principal
             React.createElement('main', { className: "flex-1 p-4 md:p-8 flex flex-col" },
+                // ... (o resto da função App continua o mesmo)
                 React.createElement('header', { className: "w-full bg-white p-4 rounded-xl shadow-lg mb-8 flex justify-between items-center" },
                     React.createElement('button', { className: "md:hidden text-gray-700 p-2", onClick: () => setIsSidebarOpen(true) }, React.createElement(LucideIcon, { name: "Menu" })),
                     React.createElement('div', { className: "text-right text-sm text-gray-600" },
@@ -612,7 +653,6 @@ function App() {
     );
 }
 
-/* FIM DO CÓDIGO ATUALIZADO PARA A FUNÇÃO App */
 
             // ================================================================
             // 5. INICIALIZAÇÃO
