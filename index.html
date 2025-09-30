@@ -250,12 +250,25 @@ function CtaAbastecimentos({ user, showToast }) {
                     const excelDate = row['Data/Hora início'];
                     let finalDate = null;
                     
-                    // CORREÇÃO: Lógica de data mais robusta
+                    // CORREÇÃO DEFINITIVA: Lógica de data mais robusta para vários formatos
                     if (excelDate) {
-                        // Tenta criar um objeto Date a partir do valor lido (seja Date, string ou número)
-                        const d = new Date(excelDate);
-                        // Verifica se a data criada é válida
-                        if (!isNaN(d.getTime())) {
+                        let d;
+                        if (excelDate instanceof Date) {
+                            d = excelDate; // Se já for um objeto Date, ótimo.
+                        } else if (typeof excelDate === 'number' && excelDate > 1) {
+                            // Converte do formato numérico do Excel
+                            d = new Date(Math.round((excelDate - 25569) * 86400 * 1000));
+                        } else if (typeof excelDate === 'string') {
+                            // Tenta converter de formatos de texto comuns, como DD/MM/YYYY HH:mm:ss
+                            const parts = excelDate.match(/(\d+)/g);
+                            if (parts && parts.length >= 5) { // Dia, Mês, Ano, Hora, Minuto
+                                // Formato: Ano, Mês-1, Dia, Hora, Minuto, Segundo
+                                d = new Date(parts[2], parts[1] - 1, parts[0], parts[3], parts[4], parts[5] || 0);
+                            }
+                        }
+
+                        // Se a conversão resultou em uma data válida, formata para o Supabase
+                        if (d && !isNaN(d.getTime())) {
                             finalDate = d.toISOString();
                         }
                     }
@@ -356,8 +369,6 @@ function CtaAbastecimentos({ user, showToast }) {
         )
     );
 }
-
-/* FIM DO CÓDIGO ATUALIZADO */
 /* INÍCIO DO CÓDIGO ATUALIZADO PARA TicketAbastecimentos */
 
 function TicketAbastecimentos({ user, showToast }) {
