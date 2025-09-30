@@ -1200,7 +1200,7 @@ function App() {
             case 'ctaAbastecimentos': return React.createElement(CtaAbastecimentos, { user, showToast });
             case 'ctaCarregamentos': return React.createElement(CtaCarregamentos, { user, showToast });
             case 'afericoes': return React.createElement(Afericoes, { user, showToast });
-            case 'cadastroFiliais': return user.nivel_permissao === 'admin' ? React.createElement(CadastroFiliais, { user, showToast }) : null;
+            case 'cadastroFiliais': return user.nivel_permissao === 'administrador' ? React.createElement(CadastroFiliais, { user, showToast }) : null;
             case 'userManagement': return React.createElement(UserManagement, { user, showToast });
             default: return React.createElement(Dashboard, { user, showToast });
         }
@@ -1270,7 +1270,7 @@ function App() {
         React.createElement(MenuItem, { page: 'afericoes', icon: 'Beaker', text: 'Aferições' }),
 
         // NOVO: Categoria de Cadastros (apenas para admin)
-        user.nivel_permissao === 'admin' && React.createElement(MenuCategory, { title: "Cadastros", icon: "PlusCircle", menuKey: "cadastros" },
+        user.nivel_permissao === 'administrador' && React.createElement(MenuCategory, { title: "Cadastros", icon: "PlusCircle", menuKey: "cadastros" },
             React.createElement(MenuItem, { page: 'cadastroFiliais', icon: 'Building', text: 'Filiais (DE/PARA)' }),
             React.createElement(MenuItem, { page: 'userManagement', icon: 'Users', text: 'Usuários' })
         )
