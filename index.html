@@ -1004,6 +1004,140 @@ function CtaAbastecimentos({ user, showToast }) {
                 );
             }
 
+            /* INÍCIO DO NOVO COMPONENTE CadastroFiliais */
+
+function CadastroFiliais({ user, showToast }) {
+    const [filiais, setFiliais] = React.useState([]);
+    const [isLoading, setIsLoading] = React.useState(true);
+    const [showForm, setShowForm] = React.useState(false);
+    const [isEditing, setIsEditing] = React.useState(false);
+    const [currentFilial, setCurrentFilial] = React.useState(null);
+
+    const initialFormState = { nome_filial: '', centro_de_custo_final: '', cta_cod_posto: '', ticket_info_adicional1: '', shell_cnpj: '' };
+    const [formData, setFormData] = React.useState(initialFormState);
+
+    const fetchFiliais = React.useCallback(async () => {
+        setIsLoading(true);
+        try {
+            const { data, error } = await supabase.from('filiais').select('*').order('nome_filial');
+            if (error) throw error;
+            setFiliais(data || []);
+        } catch (err) {
+            showToast("Erro ao carregar filiais.", "error");
+        }
+        setIsLoading(false);
+    }, [showToast]);
+
+    React.useEffect(() => {
+        fetchFiliais();
+    }, [fetchFiliais]);
+
+    const handleInputChange = (e) => {
+        setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+    };
+
+    const handleFormSubmit = async (e) => {
+        e.preventDefault();
+        if (!formData.nome_filial.trim() || !formData.centro_de_custo_final.trim()) {
+            showToast("Preencha os campos obrigatórios (Nome da Filial e Centro de Custo).", "error");
+            return;
+        }
+        setIsLoading(true);
+        try {
+            const record = {
+                nome_filial: formData.nome_filial.trim(),
+                centro_de_custo_final: formData.centro_de_custo_final.trim(),
+                cta_cod_posto: formData.cta_cod_posto.trim() || null,
+                ticket_info_adicional1: formData.ticket_info_adicional1.trim() || null,
+                shell_cnpj: formData.shell_cnpj.trim() || null,
+            };
+
+            if (isEditing) {
+                const { error } = await supabase.from('filiais').update(record).eq('id', currentFilial.id);
+                if (error) throw error;
+                showToast("Mapeamento atualizado com sucesso!", "success");
+            } else {
+                const { error } = await supabase.from('filiais').insert([{ ...record, usuario_criacao: user.nome }]);
+                if (error) throw error;
+                showToast("Novo mapeamento criado com sucesso!", "success");
+            }
+            setShowForm(false);
+            setIsEditing(false);
+            setFormData(initialFormState);
+            fetchFiliais();
+        } catch (err) {
+            showToast(`Erro ao salvar: ${err.message}`, "error");
+        }
+        setIsLoading(false);
+    };
+
+    const handleEditClick = (filial) => {
+        setIsEditing(true);
+        setCurrentFilial(filial);
+        setFormData({
+            nome_filial: filial.nome_filial || '',
+            centro_de_custo_final: filial.centro_de_custo_final || '',
+            cta_cod_posto: filial.cta_cod_posto || '',
+            ticket_info_adicional1: filial.ticket_info_adicional1 || '',
+            shell_cnpj: filial.shell_cnpj || ''
+        });
+        setShowForm(true);
+    };
+    
+    // (Opcional: Adicionar lógica de delete se necessário, similar a outros componentes)
+
+    return React.createElement('div', { className: "bg-white p-6 rounded-xl shadow-lg" },
+        React.createElement('h2', { className: "text-2xl font-bold text-gray-800 mb-6 text-center" }, "Cadastro de Filiais (DE/PARA)"),
+        
+        !showForm && React.createElement('div', { className: 'flex justify-center mb-6' },
+            React.createElement('button', {
+                onClick: () => { setShowForm(true); setIsEditing(false); setFormData(initialFormState); },
+                className: "p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center"
+            }, React.createElement(LucideIcon, { name: 'PlusCircle', className: 'mr-2 h-5 w-5' }), "Novo Mapeamento")
+        ),
+
+        showForm && React.createElement('form', { onSubmit: handleFormSubmit, className: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8 p-4 border rounded-lg bg-gray-50" },
+            React.createElement('input', { name: "nome_filial", value: formData.nome_filial, onChange: handleInputChange, placeholder: "Nome da Filial*", className: "p-2 border rounded" }),
+            React.createElement('input', { name: "centro_de_custo_final", value: formData.centro_de_custo_final, onChange: handleInputChange, placeholder: "Centro de Custo Final*", className: "p-2 border rounded" }),
+            React.createElement('input', { name: "cta_cod_posto", value: formData.cta_cod_posto, onChange: handleInputChange, placeholder: "Cód. Posto (CTA)", className: "p-2 border rounded" }),
+            React.createElement('input', { name: "ticket_info_adicional1", value: formData.ticket_info_adicional1, onChange: handleInputChange, placeholder: "Info Adicional 1 (Ticket)", className: "p-2 border rounded" }),
+            React.createElement('input', { name: "shell_cnpj", value: formData.shell_cnpj, onChange: handleInputChange, placeholder: "CNPJ (Shell)", className: "p-2 border rounded" }),
+            React.createElement('div', { className: "md:col-span-full flex justify-end gap-4" },
+                React.createElement('button', { type: "button", onClick: () => setShowForm(false), className: "py-2 px-4 bg-gray-300 rounded-lg" }, "Cancelar"),
+                React.createElement('button', { type: "submit", className: "py-2 px-4 bg-blue-600 text-white rounded-lg", disabled: isLoading }, isLoading ? 'Salvando...' : 'Salvar')
+            )
+        ),
+
+        React.createElement('div', { className: "rounded-lg border border-slate-200 shadow-sm overflow-hidden" },
+            React.createElement('table', { className: "w-full text-sm text-left text-slate-600" },
+                React.createElement('thead', { className: "text-xs text-slate-700 uppercase bg-slate-100" },
+                    React.createElement('tr', null,
+                        ["Filial", "Centro de Custo", "Cód. Posto (CTA)", "Info (Ticket)", "CNPJ (Shell)", "Ações"].map(h => 
+                            React.createElement('th', { key: h, className: "px-6 py-4 font-semibold border-b border-r border-slate-200 last:border-r-0" }, h)
+                        )
+                    )
+                ),
+                React.createElement('tbody', null,
+                    isLoading ? React.createElement('tr', null, React.createElement('td', { colSpan: 6, className: "p-4 text-center" }, "Carregando...")) :
+                    filiais.map(item => React.createElement('tr', { key: item.id, className: "hover:bg-blue-50 even:bg-slate-50" },
+                        React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, React.createElement('span', { className: 'font-medium text-slate-800' }, item.nome_filial)),
+                        React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, item.centro_de_custo_final),
+                        React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, item.cta_cod_posto),
+                        React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, item.ticket_info_adicional1),
+                        React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, item.shell_cnpj),
+                        React.createElement('td', { className: "px-6 py-4 text-center" }, 
+                            React.createElement('button', {onClick:()=>handleEditClick(item), className:"text-gray-400 hover:text-blue-600 transition-colors"}, 
+                                React.createElement(LucideIcon, {name:'Edit', className: 'h-5 w-5'})
+                            )
+                        )
+                    ))
+                )
+            )
+        )
+    );
+}
+
+/* FIM DO NOVO COMPONENTE */
             // --- ESQUELETO: User Management ---
             function UserManagement({ user, showToast }) {
                 // TODO: Adicionar lógica completa de CRUD de usuários
@@ -1066,6 +1200,7 @@ function App() {
             case 'ctaAbastecimentos': return React.createElement(CtaAbastecimentos, { user, showToast });
             case 'ctaCarregamentos': return React.createElement(CtaCarregamentos, { user, showToast });
             case 'afericoes': return React.createElement(Afericoes, { user, showToast });
+            case 'cadastroFiliais': return user.nivel_permissao === 'admin' ? React.createElement(CadastroFiliais, { user, showToast }) : null;
             case 'userManagement': return React.createElement(UserManagement, { user, showToast });
             default: return React.createElement(Dashboard, { user, showToast });
         }
@@ -1123,17 +1258,24 @@ function App() {
                 ),
                 
                 React.createElement('nav', { className: "flex-grow" },
-                    React.createElement('ul', { className: "space-y-2" },
-                        React.createElement(MenuItem, { page: 'dashboard', icon: 'LayoutDashboard', text: 'Dashboard' }),
-                        React.createElement(MenuCategory, { title: "Importação", icon: "PlusCircle", menuKey: "importacao" },
-                            React.createElement(MenuItem, { page: 'ticketAbastecimentos', icon: 'Ticket', text: 'Ticket Abastecimentos' }),
-                            React.createElement(MenuItem, { page: 'ctaAbastecimentos', icon: 'Fuel', text: 'CTA Abastecimentos' }),
-                            React.createElement(MenuItem, { page: 'ctaCarregamentos', icon: 'Ship', text: 'CTA Carregamentos' })
-                        ),
-                        React.createElement(MenuItem, { page: 'afericoes', icon: 'Beaker', text: 'Aferições' }),
-                        user.nivel_permissao === 'admin' && React.createElement(MenuItem, { page: 'userManagement', icon: 'Users', text: 'Usuários' })
-                    )
-                ),
+    React.createElement('ul', { className: "space-y-2" },
+        React.createElement(MenuItem, { page: 'dashboard', icon: 'LayoutDashboard', text: 'Dashboard' }),
+
+        React.createElement(MenuCategory, { title: "Importação", icon: "PlusCircle", menuKey: "importacao" },
+            React.createElement(MenuItem, { page: 'ticketAbastecimentos', icon: 'Ticket', text: 'Ticket Abastecimentos' }),
+            React.createElement(MenuItem, { page: 'ctaAbastecimentos', icon: 'Fuel', text: 'CTA Abastecimentos' }),
+            React.createElement(MenuItem, { page: 'ctaCarregamentos', icon: 'Ship', text: 'CTA Carregamentos' })
+        ),
+
+        React.createElement(MenuItem, { page: 'afericoes', icon: 'Beaker', text: 'Aferições' }),
+
+        // NOVO: Categoria de Cadastros (apenas para admin)
+        user.nivel_permissao === 'admin' && React.createElement(MenuCategory, { title: "Cadastros", icon: "PlusCircle", menuKey: "cadastros" },
+            React.createElement(MenuItem, { page: 'cadastroFiliais', icon: 'Building', text: 'Filiais (DE/PARA)' }),
+            React.createElement(MenuItem, { page: 'userManagement', icon: 'Users', text: 'Usuários' })
+        )
+    )
+),
 
                 // GARANTIDO: Botão de recolher/expandir está aqui
                 React.createElement('div', {className: 'mt-auto pt-4 border-t border-gray-700'},
