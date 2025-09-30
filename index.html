@@ -1554,7 +1554,7 @@ function App() {
         // NOVO: Categoria Operacional criada
         React.createElement(MenuCategory, { title: "Operacional", icon: "Settings", menuKey: "operacional" },
             // MOVIDO: Item Aferições agora está aqui dentro
-            React.createElement(MenuItem, { page: 'afericoes', icon: 'Beaker', text: 'Aferições' })
+            React.createElement(MenuItem, { page: 'afericoes', icon: 'Tank', text: 'Aferições' }),
         ),
         
         user.nivel_permissao === 'administrador' && React.createElement(MenuCategory, { title: "Cadastros", icon: "FileText", menuKey: "cadastros" },
