@@ -495,6 +495,8 @@ function CtaCarregamentos({ user, showToast }) {
 
 /* INÍCIO DO CÓDIGO ATUALIZADO PARA A FUNÇÃO App */
 
+/* INÍCIO DO CÓDIGO CORRIGIDO PARA A FUNÇÃO App */
+
 function App() {
     const [user, setUser] = React.useState(() => {
         const savedUser = localStorage.getItem('userSession');
@@ -505,8 +507,6 @@ function App() {
     const [toast, setToast] = React.useState({ show: false, message: '', type: '' });
     const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
     const [openMenu, setOpenMenu] = React.useState('');
-
-    // NOVO: Estado para controlar se a sidebar está recolhida
     const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(false);
 
     const handleLogin = (userData) => {
@@ -523,7 +523,6 @@ function App() {
     const showToast = (message, type = 'success') => setToast({ show: true, message, type });
     const closeToast = () => setToast({ show: false, message: '', type: '' });
 
-    // ATUALIZADO: Função de menu para expandir a sidebar se estiver recolhida
     const toggleMenu = (menu) => {
         if (isSidebarCollapsed) {
             setIsSidebarCollapsed(false);
@@ -532,16 +531,14 @@ function App() {
         }
     };
 
-    // NOVO: Função para recolher/expandir a sidebar
     const toggleSidebarCollapse = () => {
         setIsSidebarCollapsed(!isSidebarCollapsed);
         if (!isSidebarCollapsed) {
-            setOpenMenu(''); // Fecha submenus ao recolher
+            setOpenMenu('');
         }
     };
 
     const renderPage = () => {
-        // ... (a função renderPage continua a mesma)
         switch (currentPage) {
             case 'dashboard': return React.createElement(Dashboard, { user, showToast });
             case 'ticketAbastecimentos': return React.createElement(TicketAbastecimentos, { user, showToast });
@@ -557,7 +554,6 @@ function App() {
         return React.createElement(LoginPage, { onLogin: handleLogin });
     }
 
-    // ATUALIZADO: Componentes de menu agora reagem ao estado 'isSidebarCollapsed'
     const MenuItem = ({ page, icon, text }) => {
        const isActive = currentPage === page;
        return React.createElement('li', null,
@@ -592,17 +588,16 @@ function App() {
 
     return (
         React.createElement('div', { className: "flex min-h-screen bg-gray-100" },
-            // ATUALIZADO: Sidebar com classes e lógica para recolher/expandir
             React.createElement('aside', { className: `fixed inset-y-0 left-0 bg-gray-800 text-white p-4 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:relative md:translate-x-0 transition-all duration-300 z-30 flex flex-col ${isSidebarCollapsed ? 'w-20' : 'w-64'}` },
-                // ATUALIZADO: Seção do logo no lugar do texto 'Meu Site'
-                React.createElement('div', { className: `flex items-center mb-8 ${isSidebarCollapsed ? 'justify-center' : 'justify-between'}` },
-                    !isSidebarCollapsed && React.createElement('img', { 
+                
+                // CORRIGIDO: Container do logo agora sempre centralizado
+                React.createElement('div', { className: "flex items-center justify-center mb-8" },
+                    React.createElement('img', { 
                         src: "https://ikypygpbdmoxozfmwewr.supabase.co/storage/v1/object/sign/logo/LOGO_TERSYS-removebg-preview%20(1)%20(1).png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9lMGJiMDk5Zi1jZmE5LTQ5Y2UtYjUwNy0wZmE2ZWZkYWYxOTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJsb2dvL0xPR09fVEVSU1lTLXJlbW92ZWJnLXByZXZpZXcgKDEpICgxKS5wbmciLCJpYXQiOjE3NTkyMzU4NTYsImV4cCI6MjA3NDU5NTg1Nn0.R8XPKzBUjrjR3kcJijIvDaCGpGMlvyMKA6lsqiSOcEQ", 
                         alt: "Logo", 
-                        className: "h-12 w-auto cursor-pointer", 
+                        className: `cursor-pointer transition-all duration-300 ${isSidebarCollapsed ? 'h-10 w-auto' : 'h-12 w-auto'}`,
                         onClick: () => setCurrentPage('dashboard') 
-                    }),
-                    React.createElement('button', { onClick: () => setIsSidebarOpen(false), className: "md:hidden text-white" }, React.createElement(LucideIcon, { name: "X" }))
+                    })
                 ),
                 
                 React.createElement('nav', { className: "flex-grow" },
@@ -618,7 +613,6 @@ function App() {
                     )
                 ),
 
-                // NOVO: Div com os botões de controle da sidebar (recolher e sair)
                 React.createElement('div', {className: 'mt-auto pt-4 border-t border-gray-700'},
                     React.createElement('button', { 
                         onClick: toggleSidebarCollapse, 
@@ -636,9 +630,7 @@ function App() {
                 )
             ),
             
-            // Conteúdo Principal
             React.createElement('main', { className: "flex-1 p-4 md:p-8 flex flex-col" },
-                // ... (o resto da função App continua o mesmo)
                 React.createElement('header', { className: "w-full bg-white p-4 rounded-xl shadow-lg mb-8 flex justify-between items-center" },
                     React.createElement('button', { className: "md:hidden text-gray-700 p-2", onClick: () => setIsSidebarOpen(true) }, React.createElement(LucideIcon, { name: "Menu" })),
                     React.createElement('div', { className: "text-right text-sm text-gray-600" },
@@ -653,7 +645,7 @@ function App() {
     );
 }
 
-
+/* FIM DO CÓDIGO ATUALIZADO */
             // ================================================================
             // 5. INICIALIZAÇÃO
             // ================================================================
