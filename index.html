@@ -153,23 +153,19 @@
                     React.createElement('p', null, "Dashboard com os últimos abastecimentos de cada origem (em desenvolvimento).")
                 );
             }
-            /* INÍCIO DO CÓDIGO ATUALIZADO PARA CtaAbastecimentos */
+/* INÍCIO DO CÓDIGO ATUALIZADO PARA CtaAbastecimentos */
 
 function CtaAbastecimentos({ user, showToast }) {
-    // Estados para a lista de dados e carregamento
     const [abastecimentos, setAbastecimentos] = React.useState([]);
     const [isLoading, setIsLoading] = React.useState(false);
 
-    // Estados para o formulário de cadastro manual
     const [showForm, setShowForm] = React.useState(false);
     const initialFormState = { data_hora_inicio: '', placa: '', volume: '', custo_total: '', cod_posto: '', cod_frentista: '' };
     const [formData, setFormData] = React.useState(initialFormState);
 
-    // Estados para a importação de planilha
     const [file, setFile] = React.useState(null);
     const [isImporting, setIsImporting] = React.useState(false);
 
-    // Estados para os filtros de busca
     const [filters, setFilters] = React.useState({ placa: '', data: '', cod_posto: '' });
     const [hasSearched, setHasSearched] = React.useState(false);
 
@@ -179,7 +175,6 @@ function CtaAbastecimentos({ user, showToast }) {
         return date.toLocaleString('pt-BR');
     };
 
-    // --- LÓGICA PARA BUSCA ---
     const handleFilterChange = (e) => {
         setFilters(prev => ({ ...prev, [e.target.name]: e.target.value }));
     };
@@ -206,7 +201,6 @@ function CtaAbastecimentos({ user, showToast }) {
         setIsLoading(false);
     };
 
-    // --- LÓGICA PARA FORMULÁRIO MANUAL ---
     const handleInputChange = (e) => {
         setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
     };
@@ -227,14 +221,13 @@ function CtaAbastecimentos({ user, showToast }) {
             showToast("Abastecimento registrado com sucesso!", "success");
             setFormData(initialFormState);
             setShowForm(false);
-            handleSearch(); // Atualiza a busca
+            handleSearch();
         } catch (err) {
             showToast(`Erro ao registrar: ${err.message}`, "error");
         }
         setIsLoading(false);
     };
 
-    // --- LÓGICA PARA IMPORTAÇÃO DE PLANILHA ---
     const handleFileChange = (e) => {
         if (e.target.files && e.target.files[0]) {
             setFile(e.target.files[0]);
@@ -254,9 +247,21 @@ function CtaAbastecimentos({ user, showToast }) {
                 const json = XLSX.utils.sheet_to_json(worksheet);
 
                 const dataToInsert = json.slice(0, -1).map(row => {
-                    const transacaoDate = row['Data/Hora início'];
+                    const excelDate = row['Data/Hora início'];
+                    let finalDate = null;
+                    
+                    // CORREÇÃO: Lógica de data mais robusta
+                    if (excelDate) {
+                        // Tenta criar um objeto Date a partir do valor lido (seja Date, string ou número)
+                        const d = new Date(excelDate);
+                        // Verifica se a data criada é válida
+                        if (!isNaN(d.getTime())) {
+                            finalDate = d.toISOString();
+                        }
+                    }
+
                     return {
-                        data_hora_inicio: transacaoDate instanceof Date ? transacaoDate.toISOString() : null,
+                        data_hora_inicio: finalDate,
                         placa: row['Placa'],
                         volume: parseFloat(row['Volume (l)']) || 0,
                         custo_total: parseFloat(row['Custo Total (R$)']) || 0,
@@ -291,8 +296,9 @@ function CtaAbastecimentos({ user, showToast }) {
 
 
     return React.createElement('div', { className: "bg-white p-6 rounded-xl shadow-lg" },
-        React.createElement('div', { className: "flex justify-between items-center mb-6" },
-            React.createElement('h2', { className: "text-2xl font-bold text-gray-800" }, "CTA Abastecimentos"),
+        React.createElement('h2', { className: "text-2xl font-bold text-gray-800 mb-6 text-center" }, "CTA Abastecimentos"),
+        
+        React.createElement('div', { className: "flex justify-end mb-4" },
             React.createElement('button', { onClick: () => setShowForm(!showForm), className: "p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center" }, 
                 React.createElement(LucideIcon, { name: 'PlusCircle', className: 'mr-2 h-5 w-5' }),
                 showForm ? "Fechar Formulário" : "Novo Abastecimento"
