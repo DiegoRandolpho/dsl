@@ -286,12 +286,12 @@ function CtaCarregamentos({ user, showToast }) {
                     }
 
                     return {
-                        cod_posto: row['Cod Posto'],
+                        cod_posto: row['Cod. do Posto'],
                         // Garante que os valores sejam numéricos
-                        volume: parseFloat(row['Volume']) || 0,
-                        custo: parseFloat(row['Custo']) || 0,
-                        preco_por_litro: parseFloat(row['Preço p/ Litro']) || 0,
-                        nota_fiscal: row['Nota Fiscal'],
+                        volume: parseFloat(row['Volume (l)']) || 0,
+                        custo: parseFloat(row['Custo (R$)']) || 0,
+                        preco_por_litro: parseFloat(row['Preço por Litro/M³']) || 0,
+                        nota_fiscal: row['Nº Nota Fiscal'],
                         fornecedor: row['Fornecedor'],
                         entrega: deliveryDate,
                         usuario_criacao: user.nome,
