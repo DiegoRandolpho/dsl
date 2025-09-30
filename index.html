@@ -1260,17 +1260,17 @@ function App() {
                 React.createElement('nav', { className: "flex-grow" },
     React.createElement('ul', { className: "space-y-2" },
         React.createElement(MenuItem, { page: 'dashboard', icon: 'LayoutDashboard', text: 'Dashboard' }),
-
+        
         React.createElement(MenuCategory, { title: "Importação", icon: "PlusCircle", menuKey: "importacao" },
             React.createElement(MenuItem, { page: 'ticketAbastecimentos', icon: 'Ticket', text: 'Ticket Abastecimentos' }),
             React.createElement(MenuItem, { page: 'ctaAbastecimentos', icon: 'Fuel', text: 'CTA Abastecimentos' }),
             React.createElement(MenuItem, { page: 'ctaCarregamentos', icon: 'Ship', text: 'CTA Carregamentos' })
         ),
-
+        
         React.createElement(MenuItem, { page: 'afericoes', icon: 'Beaker', text: 'Aferições' }),
-
-        // NOVO: Categoria de Cadastros (apenas para admin)
-        user.nivel_permissao === 'administrador' && React.createElement(MenuCategory, { title: "Cadastros", icon: "PlusCircle", menuKey: "cadastros" },
+        
+        // ÍCONE ATUALIZADO: Trocado 'PlusCircle' por 'FileText'
+        user.nivel_permissao === 'administrador' && React.createElement(MenuCategory, { title: "Cadastros", icon: "FileText", menuKey: "cadastros" },
             React.createElement(MenuItem, { page: 'cadastroFiliais', icon: 'Building', text: 'Filiais (DE/PARA)' }),
             React.createElement(MenuItem, { page: 'userManagement', icon: 'Users', text: 'Usuários' })
         )
