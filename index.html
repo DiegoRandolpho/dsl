@@ -564,7 +564,7 @@ function CtaAbastecimentos({ user, showToast }) {
             React.createElement('input', { name: "placa", value: formData.placa, onChange: handleInputChange, placeholder: "Placa", className: "p-2 border rounded" }),
             React.createElement('input', { name: "cod_posto", value: formData.cod_posto, onChange: handleInputChange, placeholder: "Cód. Posto", className: "p-2 border rounded" }),
             React.createElement('input', { name: "cod_frentista", value: formData.cod_frentista, onChange: handleInputChange, placeholder: "Cód. Frentista", className: "p-2 border rounded" }),
-            React.createElement('input', { name: "volume", type: "number", step: "0.01", value: formData.volume, onChange: handleInputChange, placeholder: "Volume (l)", className: "p-2 border rounded" }),
+            React.createElement('input', { name: "volume", type: "number", step: "0.01", value: formData.volume, onChange: handleInputChange, placeholder: "Volume (ml)", className: "p-2 border rounded" }),
             React.createElement('input', { name: "custo_total", type: "number", step: "0.01", value: formData.custo_total, onChange: handleInputChange, placeholder: "Custo Total (R$)", className: "p-2 border rounded" }),
             React.createElement('input', { name: "data_hora_inicio", type: "datetime-local", value: formData.data_hora_inicio, onChange: handleInputChange, className: "p-2 border rounded" }),
             React.createElement('div', { className: "md:col-span-3 flex justify-end gap-4" },
@@ -592,7 +592,7 @@ function CtaAbastecimentos({ user, showToast }) {
             React.createElement('table', { className: "w-full text-sm text-left text-slate-600" },
                 React.createElement('thead', { className: "text-xs text-slate-700 uppercase bg-slate-100" },
                     React.createElement('tr', null,
-                        ["Data/Hora", "Placa", "Volume (l)", "Custo Total", "Cód. Posto"].map(h => React.createElement('th', { key: h, className: "px-6 py-4 font-semibold border-b border-r border-slate-200 last:border-r-0" }, h))
+                        ["Data/Hora", "Placa", "Volume (ml)", "Custo Total", "Cód. Posto"].map(h => React.createElement('th', { key: h, className: "px-6 py-4 font-semibold border-b border-r border-slate-200 last:border-r-0" }, h))
                     )
                 ),
                 React.createElement('tbody', null,
@@ -912,7 +912,7 @@ function CtaAbastecimentos({ user, showToast }) {
                     return {
                         data_hora_inicio: finalDate,
                         placa: row['Placa'],
-                        volume: parseFloat(row['Volume (l)']) || 0,
+                        volume: parseFloat(row['Volume (ml)']) || 0,
                         custo_total: parseFloat(row['Custo Total (R$)']) || 0,
                         cod_posto: row['Cod. do Posto'],
                         cod_frentista: row['Cod. do Frentista'],
