@@ -723,6 +723,8 @@ function CtaAbastecimentos({ user, showToast }) {
 
 /* INÍCIO DO CÓDIGO COMPLETO PARA TicketAbastecimentos */
 
+/* INÍCIO DO CÓDIGO COMPLETO PARA TicketAbastecimentos */
+
 function TicketAbastecimentos({ user, showToast }) {
     const [abastecimentos, setAbastecimentos] = React.useState([]);
     const [isLoading, setIsLoading] = React.useState(false);
@@ -731,6 +733,21 @@ function TicketAbastecimentos({ user, showToast }) {
     
     const [filters, setFilters] = React.useState({ placa: '', data_inicio: null, data_fim: null, cidade: '', nome_estabelecimento: '' });
     const [hasSearched, setHasSearched] = React.useState(false);
+
+    const [combustivelMap, setCombustivelMap] = React.useState(new Map());
+
+    React.useEffect(() => {
+        const fetchMapping = async () => {
+            const { data, error } = await supabase.from('combustivel_mapeamento').select('nome_original, nome_padronizado');
+            if (error) {
+                showToast("Aviso: Não foi possível carregar as regras de mapeamento de combustível.", "error");
+            } else {
+                const map = new Map(data.map(rule => [rule.nome_original, rule.nome_padronizado]));
+                setCombustivelMap(map);
+            }
+        };
+        fetchMapping();
+    }, [showToast]);
 
     const formatDate = (dateString) => {
         if (!dateString) return '—';
@@ -795,12 +812,15 @@ function TicketAbastecimentos({ user, showToast }) {
                         const d = new Date(transacaoDate);
                         if (!isNaN(d.getTime())) { finalDate = d.toISOString(); }
                     }
+                    const originalCombustivel = row['TIPO COMBUSTIVEL'];
+                    const padronizadoCombustivel = combustivelMap.get(originalCombustivel) || originalCombustivel;
+                    
                     return {
                         codigo_transacao: row['CODIGO TRANSACAO'],
                         servico: row['SERVICO'],
                         data_transacao: finalDate,
                         placa: row['PLACA'],
-                        tipo_combustivel: row['TIPO COMBUSTIVEL'],
+                        tipo_combustivel: padronizadoCombustivel,
                         litros: parseFloat(row['LITROS']) || 0,
                         vl_litro: parseFloat(row['VL/LITRO']) || 0,
                         valor_emissao: parseFloat(row['VALOR EMISSAO']) || 0,
@@ -815,7 +835,7 @@ function TicketAbastecimentos({ user, showToast }) {
                 });
 
                 if (dataToInsert.length === 0) {
-                    showToast("Nenhum dado válido encontrado na planilha.", "info");
+                    showToast("Nenhum dado válido encontrado na planilha (ignorando a linha de total).", "info");
                     setIsImporting(false);
                     return;
                 }
@@ -849,31 +869,19 @@ function TicketAbastecimentos({ user, showToast }) {
             React.createElement('div', { className: "lg:col-span-2" },
                 React.createElement(DateRangePicker, {
                     onDatesChange: (dates) => {
-                        setFilters(prev => ({
-                            ...prev,
-                            data_inicio: dates[0] || null,
-                            data_fim: dates[1] || null
-                        }));
+                        setFilters(prev => ({ ...prev, data_inicio: dates[0] || null, data_fim: dates[1] || null }));
                     }
                 })
             ),
-             React.createElement('div', null, 
-                React.createElement('label', { className: "block text-sm font-medium" }, "Placa"), 
-                React.createElement('input', { type: "text", name: "placa", value: filters.placa, onChange: handleFilterChange, className: "mt-1 w-full p-2 border rounded" })
-            ),
-             React.createElement('div', null, 
-                React.createElement('label', { className: "block text-sm font-medium" }, "Estabelecimento"), 
-                React.createElement('input', { type: "text", name: "nome_estabelecimento", value: filters.nome_estabelecimento, onChange: handleFilterChange, className: "mt-1 w-full p-2 border rounded" })
-            ),
+            React.createElement('div', null, React.createElement('label', { className: "block text-sm font-medium" }, "Placa"), React.createElement('input', { type: "text", name: "placa", value: filters.placa, onChange: handleFilterChange, className: "mt-1 w-full p-2 border rounded" })),
+            React.createElement('div', null, React.createElement('label', { className: "block text-sm font-medium" }, "Estabelecimento"), React.createElement('input', { type: "text", name: "nome_estabelecimento", value: filters.nome_estabelecimento, onChange: handleFilterChange, className: "mt-1 w-full p-2 border rounded" })),
             React.createElement('button', { onClick: handleSearch, disabled: isLoading, className: "w-full p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition lg:col-start-4" }, 'Buscar')
         ),
         React.createElement('div', { className: "rounded-lg border border-slate-200 shadow-sm overflow-hidden" },
             React.createElement('table', { className: "w-full text-sm text-left text-slate-600" },
                 React.createElement('thead', { className: "text-xs text-slate-700 uppercase bg-slate-100" },
                     React.createElement('tr', null,
-                        ["Data", "Placa", "Estabelecimento", "Combustível", "Litros", "Vl/Litro", "Valor Total"].map(h => 
-                            React.createElement('th', { key: h, className: "px-6 py-4 font-semibold border-b border-r border-slate-200 last:border-r-0" }, h)
-                        )
+                        ["Data", "Placa", "Estabelecimento", "Combustível", "Litros", "Vl/Litro", "Valor Total"].map(h => React.createElement('th', { key: h, className: "px-6 py-4 font-semibold border-b border-r border-slate-200 last:border-r-0" }, h))
                     )
                 ),
                 React.createElement('tbody', null,
