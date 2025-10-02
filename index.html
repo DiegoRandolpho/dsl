@@ -9,6 +9,7 @@
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://npmcdn.com/flatpickr/dist/l10n/pt.js"></script>
     <style>
         .login-bg-image-new {
             background-image: url('https://ikypygpbdmoxozfmwewr.supabase.co/storage/v1/object/sign/Loginpage/unnamed%20(1).png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9lMGJiMDk5Zi1jZmE5LTQ5Y2UtYjUwNy0wZmE2ZWZkYWYxOTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJMb2dpbnBhZ2UvdW5uYW1lZCAoMSkucG5nIiwiaWF0IjoxNzU5MjYxNjYwLCJleHAiOjIwNzQ2MjE2NjB9.rulaTJo6deZqm5CNYCEfbKBf1K3HzljRLHRPoqAl_V8');
@@ -50,6 +51,7 @@
             FileText: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L15 2z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>',
             Tank: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="6" rx="2"/><path d="M12 6V4"/><path d="M12 2v2"/><path d="M10 2h4"/><path d="m14 6-1 1-1-1"/><path d="m10 6-1 1-1-1"/><path d="M6 22h12"/><path d="M6 18h2"/><path d="M16 18h2"/></svg>',
             ChevronsLeft: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m11 17-5-5 5-5"/><path d="m18 17-5-5 5-5"/></svg>',
+            CalendarDays: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></svg>',
             Settings: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.78 1.28a2 2 0 0 0 .73 2.73l.04.02a2 2 0 0 1 .97 1.95v.44a2 2 0 0 1-.97 1.95l-.04.02a2 2 0 0 0-.73 2.73l.78 1.28a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.78-1.28a2 2 0 0 0-.73-2.73l-.04-.02a2 2 0 0 1-.97-1.95v-.44a2 2 0 0 1 .97-1.95l-.04-.02a2 2 0 0 0 .73-2.73l-.78-1.28a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>',
             ChevronsRight: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 17 5-5-5-5"/><path d="m13 17 5-5-5-5"/></svg>',
         };
@@ -80,7 +82,7 @@
                 }, [onClose]);
                 return React.createElement('div', { className: `fixed bottom-4 right-4 ${bgColor} text-white p-4 rounded-lg shadow-lg flex items-center z-50` }, message);
             }
-            /* INÍCIO DO NOVO COMPONENTE REUTILIZÁVEL DateRangePicker */
+       /* INÍCIO DO CÓDIGO ATUALIZADO PARA DateRangePicker */
 
 function DateRangePicker({ onDatesChange, placeholder }) {
     const inputRef = React.useRef(null);
@@ -88,38 +90,44 @@ function DateRangePicker({ onDatesChange, placeholder }) {
     React.useEffect(() => {
         if (!inputRef.current) return;
 
-        // Inicializa o calendário no campo de input
         const fp = flatpickr(inputRef.current, {
-            mode: 'range', // Habilita a seleção de período (início e fim)
-            dateFormat: "Y-m-d", // Formato que o banco de dados entende
-            altInput: true, // Mostra um formato mais amigável para o usuário
-            altFormat: "d/m/Y", // Formato amigável
+            mode: 'range',
+            dateFormat: "Y-m-d",
+            altInput: true,
+            altFormat: "d/m/Y",
+            // ATUALIZADO: Adiciona a tradução para português
+            locale: "pt", 
             onChange: (selectedDates) => {
-                // Quando o usuário seleciona duas datas, chama a função do componente pai
                 if (selectedDates.length === 2) {
                     onDatesChange(selectedDates);
+                } else if (selectedDates.length === 0) {
+                    // Limpa as datas se o usuário limpar o campo
+                    onDatesChange([]);
                 }
             },
         });
 
-        // Limpa a instância do calendário ao desmontar o componente para evitar vazamento de memória
         return () => {
             fp.destroy();
         };
     }, [onDatesChange]);
 
-    return React.createElement('div', null,
-        React.createElement('label', { className: "block text-sm font-medium" }, "Período"),
+    // ATUALIZADO: Nova estrutura com ícone de calendário
+    return React.createElement('div', { className: "relative w-full" },
+        React.createElement('div', { className: "absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none" },
+            React.createElement(LucideIcon, { name: "CalendarDays", className: "h-5 w-5 text-gray-400" })
+        ),
         React.createElement('input', {
             ref: inputRef,
             type: 'text',
             placeholder: placeholder || 'Selecione o período...',
-            className: 'mt-1 w-full p-2 border rounded'
+            // Adicionado padding à esquerda para não sobrepor o ícone
+            className: 'w-full p-2 pl-10 border rounded' 
         })
     );
 }
 
-/* FIM DO NOVO COMPONENTE */
+/* FIM DO CÓDIGO ATUALIZADO */
             function ConfirmationModal({ message, onConfirm, onCancel }) {
                 return React.createElement('div', { className: "fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50" },
                     React.createElement('div', { className: "bg-white p-8 rounded-xl shadow-2xl max-w-sm w-full text-center" },
