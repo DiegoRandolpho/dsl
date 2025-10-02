@@ -433,8 +433,15 @@ function CtaCarregamentos({ user, showToast }) {
                         React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, `R$ ${(c.preco_por_litro || 0).toFixed(3).replace('.', ',')}`),
                         React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, React.createElement('span', { className: 'font-medium text-slate-800' }, c.nota_fiscal)),
                         React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, c.fornecedor),
-                        React.createElement('td', { className: "px-6 py-4" }, formatDate(c.entre
+                        React.createElement('td', { className: "px-6 py-4" }, formatDate(c.entrega))
+                    ))
+                )
+            )
+        )
+    );
+}
 
+/* FIM DO CÓDIGO COMPLETO */
 /* INÍCIO DO CÓDIGO COMPLETO E CORRIGIDO PARA CtaAbastecimentos */
 
 function CtaAbastecimentos({ user, showToast }) {
