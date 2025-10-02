@@ -320,6 +320,8 @@ function MapeamentoCombustivel({ user, showToast }) {
 /* FIM DO NOVO COMPONENTE */
 /* INÍCIO DO CÓDIGO COMPLETO PARA CtaCarregamentos */
 
+/* INÍCIO DO CÓDIGO COMPLETO PARA CtaCarregamentos */
+
 function CtaCarregamentos({ user, showToast }) {
     const [carregamentos, setCarregamentos] = React.useState([]);
     const [isLoading, setIsLoading] = React.useState(false);
@@ -340,19 +342,9 @@ function CtaCarregamentos({ user, showToast }) {
         return date.toLocaleDateString('pt-BR');
     };
     
-    const handleInputChange = (e) => {
-        setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
-    };
-    
-    const handleFilterChange = (e) => {
-        setFilters(prev => ({ ...prev, [e.target.name]: e.target.value }));
-    };
-
-    const handleFileChange = (e) => {
-        if (e.target.files && e.target.files[0]) {
-            setFile(e.target.files[0]);
-        }
-    };
+    const handleInputChange = (e) => { setFormData(prev => ({ ...prev, [e.target.name]: e.target.value })); };
+    const handleFilterChange = (e) => { setFilters(prev => ({ ...prev, [e.target.name]: e.target.value })); };
+    const handleFileChange = (e) => { if (e.target.files && e.target.files[0]) { setFile(e.target.files[0]); } };
 
     const handleFormSubmit = async (e) => {
         e.preventDefault();
@@ -378,10 +370,7 @@ function CtaCarregamentos({ user, showToast }) {
     };
 
     const handleImport = () => {
-        if (!file) {
-            showToast("Por favor, selecione um arquivo para importar.", "error");
-            return;
-        }
+        if (!file) { showToast("Por favor, selecione um arquivo para importar.", "error"); return; }
         setIsImporting(true);
         const reader = new FileReader();
         reader.onload = async (e) => {
@@ -395,13 +384,10 @@ function CtaCarregamentos({ user, showToast }) {
                     let deliveryDate = null;
                     const excelDate = row['Entrega'];
                     if (excelDate) {
-                        if (excelDate instanceof Date) {
-                            deliveryDate = excelDate.toISOString().split('T')[0];
-                        } else if (typeof excelDate === 'string' && excelDate.includes('/')) {
+                        if (excelDate instanceof Date) { deliveryDate = excelDate.toISOString().split('T')[0]; }
+                        else if (typeof excelDate === 'string' && excelDate.includes('/')) {
                             const parts = excelDate.split('/');
-                            if (parts.length === 3) {
-                                deliveryDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
-                            }
+                            if (parts.length === 3) { deliveryDate = `${parts[2]}-${parts[1]}-${parts[0]}`; }
                         }
                     }
                     return {
@@ -416,16 +402,9 @@ function CtaCarregamentos({ user, showToast }) {
                         data_criacao: new Date().toISOString(),
                     };
                 });
-                if (dataToInsert.length === 0) {
-                    showToast("Nenhum dado válido encontrado na planilha.", "info");
-                    setIsImporting(false);
-                    return;
-                }
+                if (dataToInsert.length === 0) { showToast("Nenhum dado válido encontrado na planilha.", "info"); setIsImporting(false); return; }
                 const { error } = await supabase.from('cta_carregamentos').insert(dataToInsert);
-                if (error) {
-                    console.error("Erro do Supabase:", error);
-                    throw error;
-                }
+                if (error) { console.error("Erro do Supabase:", error); throw error; }
                 showToast(`${dataToInsert.length} registros importados com sucesso!`, "success");
                 setFile(null);
                 document.getElementById('file-input-cta-carreg').value = '';
@@ -442,9 +421,7 @@ function CtaCarregamentos({ user, showToast }) {
         setIsLoading(true);
         try {
             let query = supabase.from('cta_carregamentos').select('*');
-            if (filters.searchTerm) {
-                query = query.or(`nota_fiscal.ilike.%${filters.searchTerm.trim()}%,fornecedor.ilike.%${filters.searchTerm.trim()}%`);
-            }
+            if (filters.searchTerm) { query = query.or(`nota_fiscal.ilike.%${filters.searchTerm.trim()}%,fornecedor.ilike.%${filters.searchTerm.trim()}%`); }
             if (filters.data_inicio) {
                 query = query.gte('entrega', filters.data_inicio.toISOString());
             }
@@ -479,12 +456,9 @@ function CtaCarregamentos({ user, showToast }) {
     }, [showToast]);
 
     return React.createElement('div', { className: "bg-white p-6 rounded-xl shadow-lg" },
-        React.createElement('div', { className: "flex justify-between items-center mb-6" },
-            React.createElement('h2', { className: "text-2xl font-bold text-gray-800" }, "CTA Carregamentos"),
-            React.createElement('button', {
-                onClick: () => setShowForm(!showForm),
-                className: "p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center"
-            }, React.createElement(LucideIcon, { name: 'PlusCircle', className: 'mr-2 h-5 w-5' }), showForm ? "Fechar Formulário" : "Novo Carregamento")
+        React.createElement('h2', { className: "text-2xl font-bold text-gray-800 mb-6 text-center" }, "CTA Carregamentos"),
+        React.createElement('div', { className: "flex justify-end mb-4" },
+            React.createElement('button', { onClick: () => setShowForm(!showForm), className: "p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center" }, React.createElement(LucideIcon, { name: 'PlusCircle', className: 'mr-2 h-5 w-5' }), showForm ? "Fechar Formulário" : "Novo Carregamento")
         ),
         showForm && React.createElement('form', { onSubmit: handleFormSubmit, className: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8 p-4 border rounded-lg bg-gray-50" },
             React.createElement('input', { name: "cod_posto", value: formData.cod_posto, onChange: handleInputChange, placeholder: "Cód. Posto", className: "p-2 border rounded" }),
@@ -508,7 +482,7 @@ function CtaCarregamentos({ user, showToast }) {
         ),
         React.createElement('div', { className: "mb-6 p-4 border rounded-lg bg-gray-50 grid grid-cols-1 md:grid-cols-3 gap-4 items-end" },
             React.createElement('div', { className: 'md:col-span-2' },
-                React.createElement(DateRangePicker, {
+                 React.createElement(DateRangePicker, {
                     onDatesChange: (dates) => {
                         setFilters(prev => ({ ...prev, data_inicio: dates[0] || null, data_fim: dates[1] || null }));
                     }
