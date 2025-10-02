@@ -1253,6 +1253,8 @@ function ShellAbastecimentos({ user, showToast }) {
 
 /* INÍCIO DO CÓDIGO COMPLETO PARA Afericoes */
 
+/* INÍCIO DO CÓDIGO COMPLETO PARA Afericoes */
+
 function Afericoes({ user, showToast }) {
     const [afericoes, setAfericoes] = React.useState([]);
     const [isLoading, setIsLoading] = React.useState(false);
@@ -1266,15 +1268,16 @@ function Afericoes({ user, showToast }) {
     React.useEffect(() => {
         const fetchTanqueOptions = async () => {
             const { data, error } = await supabase.from('filiais').select('centro_de_custo_final');
-            if (error) { showToast("Erro ao carregar opções de tanque.", "error"); }
-            else {
+            if (error) {
+                showToast("Erro ao carregar opções de tanque.", "error");
+            } else {
                 const uniqueOptions = [...new Set(data.map(item => item.centro_de_custo_final).filter(Boolean))];
                 setOpcoesTanque(uniqueOptions.sort());
             }
         };
         fetchTanqueOptions();
     }, [showToast]);
-    
+
     const formatDate = (dateString) => {
         if (!dateString) return '—';
         const date = new Date(dateString.includes('T') ? dateString : dateString + 'T00:00:00');
@@ -1344,11 +1347,7 @@ function Afericoes({ user, showToast }) {
             React.createElement('div', { className: "md:col-span-2" },
                 React.createElement(DateRangePicker, {
                     onDatesChange: (dates) => {
-                        setFilters(prev => ({
-                            ...prev,
-                            data_inicio: dates[0] || null,
-                            data_fim: dates[1] || null
-                        }));
+                        setFilters(prev => ({ ...prev, data_inicio: dates[0] || null, data_fim: dates[1] || null }));
                     }
                 })
             ),
@@ -1356,7 +1355,32 @@ function Afericoes({ user, showToast }) {
             React.createElement('button', { onClick: handleSearch, disabled: isLoading, className: "w-full p-2 bg-blue-600 text-white rounded-lg md:col-start-3" }, 'Buscar')
         ),
         React.createElement('div', { className: "rounded-lg border border-slate-200 shadow-sm overflow-hidden" },
-            React.createElement('table', { /* ... */ })
+            React.createElement('table', { className: "w-full text-sm text-left text-slate-600" },
+                React.createElement('thead', { /* ... */ }),
+                React.createElement('tbody', null,
+                    isLoading ? React.createElement('tr', null, React.createElement('td', { colSpan: 7, className: "p-4 text-center" }, "Carregando...")) :
+                    !hasSearched ? React.createElement('tr', null, React.createElement('td', { colSpan: 7, className: "p-6 text-center text-slate-500" }, "Utilize os filtros para buscar as aferições.")) :
+                    afericoes.length === 0 ? React.createElement('tr', null, React.createElement('td', { colSpan: 7, className: "p-6 text-center text-slate-500" }, "Nenhuma aferição encontrada.")) :
+                    afericoes.map(item => {
+                        const diffCta = item.volume_balde - item.volume_cta;
+                        const diffBomba = item.volume_balde - item.volume_bomba;
+                        return React.createElement('tr', { key: item.id, className: "hover:bg-blue-50 even:bg-slate-50" },
+                            React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, formatDate(item.data_afericao)),
+                            React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, React.createElement('span', { className: 'font-medium text-slate-800' }, item.tanque)),
+                            React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, item.volume_balde.toFixed(2)),
+                            React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, item.volume_cta.toFixed(2)),
+                            React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, item.volume_bomba.toFixed(2)),
+                            React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" },
+                                React.createElement('div', null,
+                                    React.createElement('p', { className: diffCta !== 0 ? 'text-red-600 font-semibold' : '' }, `CTA: ${diffCta.toFixed(2)} L`),
+                                    React.createElement('p', { className: diffBomba !== 0 ? 'text-red-600 font-semibold' : '' }, `Bomba: ${diffBomba.toFixed(2)} L`)
+                                )
+                            ),
+                            React.createElement('td', { className: "px-6 py-4" }, item.observacao)
+                        );
+                    })
+                )
+            )
         )
     );
 }
