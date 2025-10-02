@@ -444,6 +444,8 @@ function CtaCarregamentos({ user, showToast }) {
 /* FIM DO CÓDIGO COMPLETO */
 /* INÍCIO DO CÓDIGO COMPLETO E CORRIGIDO PARA CtaAbastecimentos */
 
+/* INÍCIO DO CÓDIGO COMPLETO E CORRIGIDO PARA CtaAbastecimentos */
+
 function CtaAbastecimentos({ user, showToast }) {
     const [abastecimentos, setAbastecimentos] = React.useState([]);
     const [isLoading, setIsLoading] = React.useState(false);
@@ -452,14 +454,13 @@ function CtaAbastecimentos({ user, showToast }) {
     const [formData, setFormData] = React.useState(initialFormState);
     const [file, setFile] = React.useState(null);
     const [isImporting, setIsImporting] = React.useState(false);
-    
-    // O estado de filtros usa data_inicio e data_fim, que serão preenchidos pelo DateRangePicker
     const [filters, setFilters] = React.useState({ placa: '', data_inicio: null, data_fim: null, cod_posto: '' });
     const [hasSearched, setHasSearched] = React.useState(false);
 
     const formatDate = (dateString) => {
         if (!dateString) return '—';
-        return new Date(dateString).toLocaleString('pt-BR');
+        const date = new Date(dateString);
+        return date.toLocaleString('pt-BR');
     };
 
     const handleFilterChange = (e) => {
@@ -473,7 +474,6 @@ function CtaAbastecimentos({ user, showToast }) {
             let query = supabase.from('cta_abastecimentos').select('*');
             if (filters.placa) query = query.ilike('placa', `%${filters.placa.trim()}%`);
             if (filters.cod_posto) query = query.eq('cod_posto', filters.cod_posto.trim());
-            
             if (filters.data_inicio) {
                 query = query.gte('data_hora_inicio', filters.data_inicio.toISOString());
             }
@@ -482,7 +482,6 @@ function CtaAbastecimentos({ user, showToast }) {
                 endDate.setHours(23, 59, 59, 999);
                 query = query.lte('data_hora_inicio', endDate.toISOString());
             }
-
             query = query.order('data_hora_inicio', { ascending: false });
             const { data, error } = await query;
             if (error) throw error;
@@ -531,7 +530,6 @@ function CtaAbastecimentos({ user, showToast }) {
                 const sheetName = workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[sheetName];
                 const json = XLSX.utils.sheet_to_json(worksheet);
-
                 const dataToInsert = json.slice(0, -1).map(row => {
                     const excelDate = row['Data/Hora início'];
                     let finalDate = null;
@@ -577,8 +575,8 @@ function CtaAbastecimentos({ user, showToast }) {
     };
 
     return React.createElement('div', { className: "bg-white p-6 rounded-xl shadow-lg" },
-        React.createElement('h2', { className: "text-2xl font-bold text-gray-800 mb-6 text-center" }, "CTA Abastecimentos"),
-        React.createElement('div', { className: "flex justify-end mb-4" },
+        React.createElement('div', { className: "flex justify-between items-center mb-6" },
+            React.createElement('h2', { className: "text-2xl font-bold text-gray-800" }, "CTA Abastecimentos"),
             React.createElement('button', { onClick: () => setShowForm(!showForm), className: "p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center" }, 
                 React.createElement(LucideIcon, { name: 'PlusCircle', className: 'mr-2 h-5 w-5' }),
                 showForm ? "Fechar Formulário" : "Novo Abastecimento"
@@ -643,7 +641,7 @@ function CtaAbastecimentos({ user, showToast }) {
     );
 }
 
-/* FIM DO CÓDIGO COMPLETO */
+/* FIM DO CÓDIGO COMPLETO E CORRIGIDO */
 
 /* INÍCIO DO CÓDIGO COMPLETO PARA TicketAbastecimentos */
 
