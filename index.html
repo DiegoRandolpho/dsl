@@ -384,7 +384,7 @@ function CtaCarregamentos({ user, showToast }) {
 
 /* FIM DO CÓDIGO COMPLETO */
 
-/* INÍCIO DO CÓDIGO COMPLETO PARA CtaAbastecimentos */
+/* INÍCIO DO CÓDIGO COMPLETO E CORRIGIDO PARA CtaAbastecimentos */
 
 function CtaAbastecimentos({ user, showToast }) {
     const [abastecimentos, setAbastecimentos] = React.useState([]);
@@ -470,6 +470,7 @@ function CtaAbastecimentos({ user, showToast }) {
                 const sheetName = workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[sheetName];
                 const json = XLSX.utils.sheet_to_json(worksheet);
+
                 const dataToInsert = json.slice(0, -1).map(row => {
                     const excelDate = row['Data/Hora início'];
                     let finalDate = null;
@@ -502,7 +503,7 @@ function CtaAbastecimentos({ user, showToast }) {
                 const { error } = await supabase.from('cta_abastecimentos').insert(dataToInsert, { returning: 'minimal' });
                 if (error) { console.error("Erro do Supabase:", error); throw error; }
                 showToast(`${dataToInsert.length} registros importados com sucesso!`, "success");
-                setFile(null);
+                setFile(null); 
                 document.getElementById('file-input-cta-abs').value = '';
                 setHasSearched(false);
                 setAbastecimentos([]);
@@ -516,12 +517,14 @@ function CtaAbastecimentos({ user, showToast }) {
 
     return React.createElement('div', { className: "bg-white p-6 rounded-xl shadow-lg" },
         React.createElement('h2', { className: "text-2xl font-bold text-gray-800 mb-6 text-center" }, "CTA Abastecimentos"),
+        
         React.createElement('div', { className: "flex justify-end mb-4" },
-            React.createElement('button', { onClick: () => setShowForm(!showForm), className: "p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center" },
+            React.createElement('button', { onClick: () => setShowForm(!showForm), className: "p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center" }, 
                 React.createElement(LucideIcon, { name: 'PlusCircle', className: 'mr-2 h-5 w-5' }),
                 showForm ? "Fechar Formulário" : "Novo Abastecimento"
             )
         ),
+
         showForm && React.createElement('form', { onSubmit: handleFormSubmit, className: "grid grid-cols-1 md:grid-cols-3 gap-4 mb-8 p-4 border rounded-lg bg-gray-50" },
             React.createElement('input', { name: "placa", value: formData.placa, onChange: handleInputChange, placeholder: "Placa", className: "p-2 border rounded" }),
             React.createElement('input', { name: "cod_posto", value: formData.cod_posto, onChange: handleInputChange, placeholder: "Cód. Posto", className: "p-2 border rounded" }),
@@ -534,6 +537,7 @@ function CtaAbastecimentos({ user, showToast }) {
                 React.createElement('button', { type: "submit", className: "py-2 px-4 bg-blue-600 text-white rounded-lg", disabled: isLoading }, isLoading ? 'Salvando...' : 'Salvar')
             )
         ),
+
         React.createElement('div', { className: "mb-8 p-4 border rounded-lg bg-gray-100 grid grid-cols-1 md:grid-cols-2 gap-4 items-end" },
             React.createElement('div', null,
                 React.createElement('label', { htmlFor: 'file-input-cta-abs', className: "block text-sm font-medium text-gray-700 mb-1" }, "Importar Planilha"),
@@ -541,8 +545,9 @@ function CtaAbastecimentos({ user, showToast }) {
             ),
             React.createElement('button', { onClick: handleImport, disabled: isImporting, className: "w-full p-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 transition" }, isImporting ? 'Importando...' : 'Importar Dados')
         ),
+        
+        // ATUALIZADO: Filtro de data com o novo componente
         React.createElement('div', { className: "mb-6 p-4 border rounded-lg bg-gray-50 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end" },
-            // ATUALIZADO: Filtro de data com o novo componente
             React.createElement('div', { className: "lg:col-span-2" },
                 React.createElement(DateRangePicker, {
                     onDatesChange: (dates) => {
@@ -558,6 +563,7 @@ function CtaAbastecimentos({ user, showToast }) {
             React.createElement('div', null, React.createElement('label', { className: "block text-sm font-medium" }, "Cód. do Posto"), React.createElement('input', { type: "text", name: "cod_posto", value: filters.cod_posto, onChange: handleFilterChange, className: "mt-1 w-full p-2 border rounded" })),
             React.createElement('button', { onClick: handleSearch, disabled: isLoading, className: "w-full p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition lg:col-start-4" }, 'Buscar')
         ),
+
         React.createElement('div', { className: "rounded-lg border border-slate-200 shadow-sm overflow-hidden" },
             React.createElement('table', { className: "w-full text-sm text-left text-slate-600" },
                 React.createElement('thead', { className: "text-xs text-slate-700 uppercase bg-slate-100" },
@@ -582,9 +588,7 @@ function CtaAbastecimentos({ user, showToast }) {
     );
 }
 
-/* FIM DO CÓDIGO ATUALIZADO */
-
-/* INÍCIO DO CÓDIGO ATUALIZADO PARA TicketAbastecimentos */
+/* FIM DO CÓDIGO COMPLETO */
 
 /* INÍCIO DO CÓDIGO COMPLETO PARA TicketAbastecimentos */
 
