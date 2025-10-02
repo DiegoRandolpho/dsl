@@ -220,6 +220,8 @@ function DateRangePicker({ onDatesChange, placeholder }) {
 
 /* INÍCIO DO CÓDIGO COMPLETO PARA CtaCarregamentos */
 
+/* INÍCIO DO CÓDIGO COMPLETO PARA CtaCarregamentos */
+
 function CtaCarregamentos({ user, showToast }) {
     const [carregamentos, setCarregamentos] = React.useState([]);
     const [isLoading, setIsLoading] = React.useState(false);
@@ -228,7 +230,7 @@ function CtaCarregamentos({ user, showToast }) {
     const [formData, setFormData] = React.useState(initialFormState);
     const [file, setFile] = React.useState(null);
     const [isImporting, setIsImporting] = React.useState(false);
-    const [filters, setFilters] = React.useState({ searchTerm: '', data_inicio: '', data_fim: '' });
+    const [filters, setFilters] = React.useState({ searchTerm: '', data_inicio: null, data_fim: null });
 
     const formatDate = (dateString) => {
         if (!dateString) return '—';
@@ -239,11 +241,11 @@ function CtaCarregamentos({ user, showToast }) {
         const date = new Date(dateString.includes('T') ? dateString : dateString + 'T00:00:00');
         return date.toLocaleDateString('pt-BR');
     };
-
+    
     const handleInputChange = (e) => { setFormData(prev => ({ ...prev, [e.target.name]: e.target.value })); };
     const handleFilterChange = (e) => { setFilters(prev => ({ ...prev, [e.target.name]: e.target.value })); };
     const handleFileChange = (e) => { if (e.target.files && e.target.files[0]) { setFile(e.target.files[0]); } };
-    
+
     const handleFormSubmit = async (e) => {
         e.preventDefault();
         setIsLoading(true);
@@ -320,8 +322,14 @@ function CtaCarregamentos({ user, showToast }) {
         try {
             let query = supabase.from('cta_carregamentos').select('*');
             if (filters.searchTerm) { query = query.or(`nota_fiscal.ilike.%${filters.searchTerm.trim()}%,fornecedor.ilike.%${filters.searchTerm.trim()}%`); }
-            if (filters.data_inicio) query = query.gte('entrega', filters.data_inicio);
-            if (filters.data_fim) query = query.lte('entrega', filters.data_fim);
+            if (filters.data_inicio) {
+                query = query.gte('entrega', filters.data_inicio.toISOString());
+            }
+            if (filters.data_fim) {
+                const endDate = new Date(filters.data_fim);
+                endDate.setHours(23, 59, 59, 999);
+                query = query.lte('entrega', endDate.toISOString());
+            }
             query = query.order('entrega', { ascending: false });
             const { data, error } = await query;
             if (error) throw error;
@@ -349,17 +357,21 @@ function CtaCarregamentos({ user, showToast }) {
 
     return React.createElement('div', { className: "bg-white p-6 rounded-xl shadow-lg" },
         React.createElement('h2', { className: "text-2xl font-bold text-gray-800 mb-6 text-center" }, "CTA Carregamentos"),
-        // ... (seções de formulário e importação) ...
-
+        React.createElement('div', { className: "flex justify-end mb-4" },
+            React.createElement('button', { /* ... */ })
+        ),
+        showForm && React.createElement('form', { /* ... */ }),
+        React.createElement('div', { className: "mb-8 p-4 border rounded-lg bg-gray-100 grid grid-cols-1 md:grid-cols-2 gap-4 items-end" },
+            /* ... */
+        ),
         React.createElement('div', { className: "mb-6 p-4 border rounded-lg bg-gray-50 grid grid-cols-1 md:grid-cols-3 gap-4 items-end" },
-            // ATUALIZADO: Filtro de data com o novo componente
             React.createElement('div', { className: 'md:col-span-2' },
                  React.createElement(DateRangePicker, {
                     onDatesChange: (dates) => {
                         setFilters(prev => ({
                             ...prev,
-                            data_inicio: dates[0] ? dates[0].toISOString().split('T')[0] : '',
-                            data_fim: dates[1] ? dates[1].toISOString().split('T')[0] : ''
+                            data_inicio: dates[0] || null,
+                            data_fim: dates[1] || null
                         }));
                     }
                 })
@@ -371,11 +383,20 @@ function CtaCarregamentos({ user, showToast }) {
             React.createElement('button', { onClick: handleSearch, disabled: isLoading, className: "w-full p-2 bg-blue-600 text-white rounded-lg md:col-start-3" }, 'Buscar')
         ),
         React.createElement('div', { className: "rounded-lg border border-slate-200 shadow-sm overflow-hidden" },
-            React.createElement('table', { /* ... */ },
+            React.createElement('table', { className: "w-full text-sm text-left text-slate-600" },
+                React.createElement('thead', { /* ... */ }),
                 React.createElement('tbody', null,
                     isLoading ? React.createElement('tr', null, React.createElement('td', { colSpan: 7, className: "p-4 text-center" }, "Carregando...")) :
                     carregamentos.length === 0 ? React.createElement('tr', null, React.createElement('td', { colSpan: 7, className: "p-6 text-center text-slate-500" }, "Nenhum carregamento encontrado.")) :
-                    carregamentos.map(c => { /* ... (renderização das linhas) ... */ })
+                    carregamentos.map(c => React.createElement('tr', { key: c.id, className: "hover:bg-blue-50 even:bg-slate-50" },
+                        React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, c.cod_posto),
+                        React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, c.volume),
+                        React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, `R$ ${(c.custo || 0).toFixed(2).replace('.', ',')}`),
+                        React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, `R$ ${(c.preco_por_litro || 0).toFixed(3).replace('.', ',')}`),
+                        React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, React.createElement('span', { className: 'font-medium text-slate-800' }, c.nota_fiscal)),
+                        React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, c.fornecedor),
+                        React.createElement('td', { className: "px-6 py-4" }, formatDate(c.entrega))
+                    ))
                 )
             )
         )
@@ -598,7 +619,7 @@ function TicketAbastecimentos({ user, showToast }) {
     const [file, setFile] = React.useState(null);
     const [isImporting, setIsImporting] = React.useState(false);
     
-    const [filters, setFilters] = React.useState({ placa: '', data_inicio: '', data_fim: '', cidade: '', nome_estabelecimento: '' });
+    const [filters, setFilters] = React.useState({ placa: '', data_inicio: null, data_fim: null, cidade: '', nome_estabelecimento: '' });
     const [hasSearched, setHasSearched] = React.useState(false);
 
     const formatDate = (dateString) => {
@@ -619,8 +640,15 @@ function TicketAbastecimentos({ user, showToast }) {
             if (filters.placa) query = query.ilike('placa', `%${filters.placa.trim()}%`);
             if (filters.cidade) query = query.ilike('cidade', `%${filters.cidade.trim()}%`);
             if (filters.nome_estabelecimento) query = query.ilike('nome_estabelecimento', `%${filters.nome_estabelecimento.trim()}%`);
-            if (filters.data_inicio) query = query.gte('data_transacao', `${filters.data_inicio}T00:00:00`);
-            if (filters.data_fim) query = query.lte('data_transacao', `${filters.data_fim}T23:59:59`);
+            
+            if (filters.data_inicio) {
+                query = query.gte('data_transacao', filters.data_inicio.toISOString());
+            }
+            if (filters.data_fim) {
+                const endDate = new Date(filters.data_fim);
+                endDate.setHours(23, 59, 59, 999);
+                query = query.lte('data_transacao', endDate.toISOString());
+            }
             
             query = query.order('data_transacao', { ascending: false });
             const { data, error } = await query;
@@ -652,10 +680,15 @@ function TicketAbastecimentos({ user, showToast }) {
 
                 const dataToInsert = json.slice(0, -1).map(row => {
                     const transacaoDate = row['DATA TRANSACAO'];
+                    let finalDate = null;
+                    if (transacaoDate) {
+                        const d = new Date(transacaoDate);
+                        if (!isNaN(d.getTime())) { finalDate = d.toISOString(); }
+                    }
                     return {
                         codigo_transacao: row['CODIGO TRANSACAO'],
                         servico: row['SERVICO'],
-                        data_transacao: transacaoDate instanceof Date ? transacaoDate.toISOString() : null,
+                        data_transacao: finalDate,
                         placa: row['PLACA'],
                         tipo_combustivel: row['TIPO COMBUSTIVEL'],
                         litros: parseFloat(row['LITROS']) || 0,
@@ -672,16 +705,13 @@ function TicketAbastecimentos({ user, showToast }) {
                 });
 
                 if (dataToInsert.length === 0) {
-                    showToast("Nenhum dado válido encontrado na planilha (ignorando a linha de total).", "info");
+                    showToast("Nenhum dado válido encontrado na planilha.", "info");
                     setIsImporting(false);
                     return;
                 }
                 
                 const { error } = await supabase.from('ticket_abastecimentos').insert(dataToInsert, { returning: 'minimal' });
-                if (error) {
-                    console.error("Erro do Supabase:", error);
-                    throw error;
-                }
+                if (error) { console.error("Erro do Supabase:", error); throw error; }
 
                 showToast(`${dataToInsert.length} registros importados com sucesso!`, "success");
                 setFile(null); 
@@ -698,7 +728,6 @@ function TicketAbastecimentos({ user, showToast }) {
 
     return React.createElement('div', { className: "bg-white p-6 rounded-xl shadow-lg" },
         React.createElement('h2', { className: "text-2xl font-bold text-gray-800 mb-6 text-center" }, "Ticket Abastecimentos"),
-        
         React.createElement('div', { className: "mb-8 p-4 border rounded-lg bg-gray-100 grid grid-cols-1 md:grid-cols-2 gap-4 items-end" },
             React.createElement('div', null,
                 React.createElement('label', { htmlFor: 'file-input-ticket', className: "block text-sm font-medium text-gray-700 mb-1" }, "Importar Planilha de Transações"),
@@ -706,16 +735,14 @@ function TicketAbastecimentos({ user, showToast }) {
             ),
             React.createElement('button', { onClick: handleImport, disabled: isImporting, className: "w-full p-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 transition" }, isImporting ? 'Importando...' : 'Importar Dados')
         ),
-
-        // ATUALIZADO: Filtro com o DateRangePicker
         React.createElement('div', { className: "mb-6 p-4 border rounded-lg bg-gray-50 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end" },
             React.createElement('div', { className: "lg:col-span-2" },
                 React.createElement(DateRangePicker, {
                     onDatesChange: (dates) => {
                         setFilters(prev => ({
                             ...prev,
-                            data_inicio: dates[0] ? dates[0].toISOString().split('T')[0] : '',
-                            data_fim: dates[1] ? dates[1].toISOString().split('T')[0] : ''
+                            data_inicio: dates[0] || null,
+                            data_fim: dates[1] || null
                         }));
                     }
                 })
@@ -730,7 +757,6 @@ function TicketAbastecimentos({ user, showToast }) {
             ),
             React.createElement('button', { onClick: handleSearch, disabled: isLoading, className: "w-full p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition lg:col-start-4" }, 'Buscar')
         ),
-
         React.createElement('div', { className: "rounded-lg border border-slate-200 shadow-sm overflow-hidden" },
             React.createElement('table', { className: "w-full text-sm text-left text-slate-600" },
                 React.createElement('thead', { className: "text-xs text-slate-700 uppercase bg-slate-100" },
@@ -746,9 +772,7 @@ function TicketAbastecimentos({ user, showToast }) {
                     abastecimentos.length === 0 ? React.createElement('tr', null, React.createElement('td', { colSpan: 7, className: "p-6 text-center text-slate-500" }, "Nenhum resultado encontrado para sua busca.")) :
                     abastecimentos.map(item => React.createElement('tr', { key: item.id, className: "hover:bg-blue-50 even:bg-slate-50" },
                         React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, formatDate(item.data_transacao)),
-                        React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, 
-                            React.createElement('span', { className: 'font-medium text-slate-800' }, item.placa)
-                        ),
+                        React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, React.createElement('span', { className: 'font-medium text-slate-800' }, item.placa)),
                         React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, item.nome_estabelecimento),
                         React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, item.tipo_combustivel),
                         React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, item.litros),
@@ -761,8 +785,7 @@ function TicketAbastecimentos({ user, showToast }) {
     );
 }
 
-
-/* FIM DO CÓDIGO ATUALIZADO */
+/* FIM DO CÓDIGO COMPLETO */
 
 /* INÍCIO DO CÓDIGO ATUALIZADO PARA CtaAbastecimentos */
 
@@ -838,7 +861,7 @@ function Afericoes({ user, showToast }) {
     const [opcoesTanque, setOpcoesTanque] = React.useState([]);
     const initialFormState = { tanque: '', data_afericao: '', volume_balde: '', volume_cta: '', volume_bomba: '', observacao: '' };
     const [formData, setFormData] = React.useState(initialFormState);
-    const [filters, setFilters] = React.useState({ tanque: '', data_inicio: '', data_fim: '' });
+    const [filters, setFilters] = React.useState({ tanque: '', data_inicio: null, data_fim: null });
     const [hasSearched, setHasSearched] = React.useState(false);
 
     React.useEffect(() => {
@@ -852,7 +875,7 @@ function Afericoes({ user, showToast }) {
         };
         fetchTanqueOptions();
     }, [showToast]);
-
+    
     const formatDate = (dateString) => {
         if (!dateString) return '—';
         const date = new Date(dateString.includes('T') ? dateString : dateString + 'T00:00:00');
@@ -868,8 +891,14 @@ function Afericoes({ user, showToast }) {
         try {
             let query = supabase.from('afericoes').select('*');
             if (filters.tanque) query = query.ilike('tanque', `%${filters.tanque.trim()}%`);
-            if (filters.data_inicio) query = query.gte('data_afericao', filters.data_inicio);
-            if (filters.data_fim) query = query.lte('data_afericao', filters.data_fim);
+            if (filters.data_inicio) {
+                query = query.gte('data_afericao', filters.data_inicio.toISOString());
+            }
+            if (filters.data_fim) {
+                const endDate = new Date(filters.data_fim);
+                endDate.setHours(23, 59, 59, 999);
+                query = query.lte('data_afericao', endDate.toISOString());
+            }
             query = query.order('data_afericao', { ascending: false });
             const { data, error } = await query;
             if (error) throw error;
@@ -900,9 +929,11 @@ function Afericoes({ user, showToast }) {
 
     return React.createElement('div', { className: "bg-white p-6 rounded-xl shadow-lg" },
         React.createElement('h2', { className: "text-2xl font-bold text-gray-800 mb-6 text-center" }, "Aferições de Tanques"),
-        !showForm && React.createElement('div', { /* ... */ }),
+        !showForm && React.createElement('div', { className: 'flex justify-center mb-6' },
+            React.createElement('button', { onClick: () => setShowForm(true), className: "p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center" }, React.createElement(LucideIcon, { name: 'PlusCircle', className: 'mr-2 h-5 w-5' }), "Nova Aferição")
+        ),
         showForm && React.createElement('form', { onSubmit: handleFormSubmit, className: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8 p-4 border rounded-lg bg-gray-50" },
-            React.createElement('select', { name: "tanque", value: formData.tanque, onChange: handleInputChange, className: "p-2 border rounded", required: true }, React.createElement('option', { value: '' }, 'Selecione um Tanque*'), opcoesTanque.map(t => React.createElement('option', { key: t, value: t }, t))),
+            React.createElement('select', { name: "tanque", value: formData.tanque, onChange: handleInputChange, className: "p-2 border rounded", required: true }, React.createElement('option', { value: '' }, 'Selecione o Tanque*'), opcoesTanque.map(t => React.createElement('option', { key: t, value: t }, t))),
             React.createElement('input', { name: "data_afericao", type: "date", value: formData.data_afericao, onChange: handleInputChange, className: "p-2 border rounded" }),
             React.createElement('input', { name: "volume_balde", type: "number", step: "0.01", value: formData.volume_balde, onChange: handleInputChange, placeholder: "Volume Balde (ml)", className: "p-2 border rounded" }),
             React.createElement('input', { name: "volume_cta", type: "number", step: "0.01", value: formData.volume_cta, onChange: handleInputChange, placeholder: "Volume CTA (L)", className: "p-2 border rounded" }),
@@ -911,14 +942,13 @@ function Afericoes({ user, showToast }) {
             React.createElement('div', { className: "md:col-span-full flex justify-end gap-4" }, React.createElement('button', { type: "button", onClick: () => setShowForm(false), className: "py-2 px-4 bg-gray-300 rounded-lg" }, "Cancelar"), React.createElement('button', { type: "submit", className: "py-2 px-4 bg-blue-600 text-white rounded-lg", disabled: isLoading }, isLoading ? 'Salvando...' : 'Salvar'))
         ),
         React.createElement('div', { className: "mb-6 p-4 border rounded-lg bg-gray-50 grid grid-cols-1 md:grid-cols-3 gap-4 items-end" },
-            // ATUALIZADO: Filtro de data com o novo componente
             React.createElement('div', { className: "md:col-span-2" },
                 React.createElement(DateRangePicker, {
                     onDatesChange: (dates) => {
                         setFilters(prev => ({
                             ...prev,
-                            data_inicio: dates[0] ? dates[0].toISOString().split('T')[0] : '',
-                            data_fim: dates[1] ? dates[1].toISOString().split('T')[0] : ''
+                            data_inicio: dates[0] || null,
+                            data_fim: dates[1] || null
                         }));
                     }
                 })
@@ -927,7 +957,7 @@ function Afericoes({ user, showToast }) {
             React.createElement('button', { onClick: handleSearch, disabled: isLoading, className: "w-full p-2 bg-blue-600 text-white rounded-lg md:col-start-3" }, 'Buscar')
         ),
         React.createElement('div', { className: "rounded-lg border border-slate-200 shadow-sm overflow-hidden" },
-            // ... (o resto da tabela continua o mesmo) ...
+            React.createElement('table', { /* ... */ })
         )
     );
 }
