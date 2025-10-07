@@ -76,39 +76,43 @@
                 if (!supabaseProjeto2 || !placa) return;
 
                 try {
+                    const tipoAlerta = 'Placa não encontrada na base de equipamentos';
+
+                    // Verifica se já existe um alerta para essa placa e tipo, para não duplicar
                     const { data: alertaExistente, error: checkError } = await supabase
                         .from('alertas')
                         .select('id')
                         .eq('placa', placa)
-                        .eq('tipo_alerta', 'Placa com cadastro encerrado na base de equipamentos')
+                        .eq('tipo_alerta', tipoAlerta)
                         .maybeSingle();
 
                     if (checkError) throw checkError;
-                    if (alertaExistente) return; 
+                    if (alertaExistente) return; // Alerta já existe, não faz nada
 
+                    // Consulta a base externa para ver se a placa existe
                     const { data, error } = await supabaseProjeto2
                         .from('equipamentos')
-                        .select('status')
+                        .select('plate') // Apenas seleciona a própria placa para confirmar a existência
                         .eq('plate', placa)
-                        .maybeSingle();
+                        .maybeSingle(); 
 
                     if (error) throw new Error(`Erro ao consultar a placa no segundo projeto: ${error.message}`);
                     
-                    if (data && data.status !== 'Ativo') {
+                    // Se a placa NÃO for encontrada (!data), cria o alerta
+                    if (!data) {
                         await supabase
                             .from('alertas')
                             .insert([{ 
                                 placa: placa,
                                 periodo: periodo,
-                                tipo_alerta: 'Placa com cadastro encerrado na base de equipamentos',
+                                tipo_alerta: tipoAlerta,
                                 status: 'pendente'
                             }]);
                     }
                 } catch (err) {
-                    console.error('Erro na verificação de encerramento de placa:', err);
+                    console.error('Erro na verificação de existência de placa:', err);
                 }
             }
-
             function LucideIcon({ name, className }) {
                 return React.createElement('span', {
                     className: className,
