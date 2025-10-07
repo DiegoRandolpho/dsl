@@ -845,8 +845,6 @@ function CtaAbastecimentos({ user, showToast }) {
 
 /* INÍCIO DO CÓDIGO COMPLETO PARA TicketAbastecimentos */
 
-/* INÍCIO DO CÓDIGO COMPLETO PARA TicketAbastecimentos */
-
 function TicketAbastecimentos({ user, showToast }) {
     const [abastecimentos, setAbastecimentos] = React.useState([]);
     const [isLoading, setIsLoading] = React.useState(false);
@@ -995,15 +993,23 @@ function TicketAbastecimentos({ user, showToast }) {
                     }
                 })
             ),
-            React.createElement('div', null, React.createElement('label', { className: "block text-sm font-medium" }, "Placa"), React.createElement('input', { type: "text", name: "placa", value: filters.placa, onChange: handleFilterChange, className: "mt-1 w-full p-2 border rounded" })),
-            React.createElement('div', null, React.createElement('label', { className: "block text-sm font-medium" }, "Estabelecimento"), React.createElement('input', { type: "text", name: "nome_estabelecimento", value: filters.nome_estabelecimento, onChange: handleFilterChange, className: "mt-1 w-full p-2 border rounded" })),
+             React.createElement('div', null, 
+                React.createElement('label', { className: "block text-sm font-medium" }, "Placa"), 
+                React.createElement('input', { type: "text", name: "placa", value: filters.placa, onChange: handleFilterChange, className: "mt-1 w-full p-2 border rounded" })
+            ),
+             React.createElement('div', null, 
+                React.createElement('label', { className: "block text-sm font-medium" }, "Estabelecimento"), 
+                React.createElement('input', { type: "text", name: "nome_estabelecimento", value: filters.nome_estabelecimento, onChange: handleFilterChange, className: "mt-1 w-full p-2 border rounded" })
+            ),
             React.createElement('button', { onClick: handleSearch, disabled: isLoading, className: "w-full p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition lg:col-start-4" }, 'Buscar')
         ),
         React.createElement('div', { className: "rounded-lg border border-slate-200 shadow-sm overflow-hidden" },
             React.createElement('table', { className: "w-full text-sm text-left text-slate-600" },
                 React.createElement('thead', { className: "text-xs text-slate-700 uppercase bg-slate-100" },
                     React.createElement('tr', null,
-                        ["Data", "Placa", "Estabelecimento", "Combustível", "Litros", "Vl/Litro", "Valor Total"].map(h => React.createElement('th', { key: h, className: "px-6 py-4 font-semibold border-b border-r border-slate-200 last:border-r-0" }, h))
+                        ["Data", "Placa", "Estabelecimento", "Combustível", "Litros", "Vl/Litro", "Valor Total"].map(h => 
+                            React.createElement('th', { key: h, className: "px-6 py-4 font-semibold border-b border-r border-slate-200 last:border-r-0" }, h)
+                        )
                     )
                 ),
                 React.createElement('tbody', null,
