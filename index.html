@@ -54,17 +54,62 @@
             CalendarDays: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></svg>',
             Settings: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.78 1.28a2 2 0 0 0 .73 2.73l.04.02a2 2 0 0 1 .97 1.95v.44a2 2 0 0 1-.97 1.95l-.04.02a2 2 0 0 0-.73 2.73l.78 1.28a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.78-1.28a2 2 0 0 0-.73-2.73l-.04-.02a2 2 0 0 1-.97-1.95v-.44a2 2 0 0 1 .97-1.95l-.04-.02a2 2 0 0 0 .73-2.73l-.78-1.28a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>',
             ChevronsRight: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 17 5-5-5-5"/><path d="m13 17 5-5-5-5"/></svg>',
+            Edit: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>',
         };
         window.onload = function() {
             // ================================================================
             // 1. CONFIGURAÇÃO
             // ================================================================
             const SUPABASE_URL = 'https://ikypygpbdmoxozfmwewr.supabase.co';
-            const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlreXB5Z3BiZG1veG96Zm13ZXdyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkxNTE0MTYsImV4cCI6MjA3NDcyNzQxNn0.IWoX896KWVC9p1M9EcFTOk6YhSljDOtxIl3yPxZS0Xg';
+            const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlreXB5Z3BiZG1veG96Zm13ZXdyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkxNTE0MTYsImV4cCI6MjA3NDcyNzQxNn0.IWoX8_96KWVC9p1M9EcFTOk6YhSljDOtxIl3yPxZS0Xg';
             let supabase;
+
+            // ***** INÍCIO DA NOVA CONFIGURAÇÃO - PROJETO 2 *****
+            const SUPABASE_URL_PROJETO_2 = 'https://gfivmnnysomfwrffybeh.supabase.co';
+            const SUPABASE_ANON_KEY_PROJETO_2 = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdmaXZtbm55c29tZndyZmZ5YmVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMyOTY3NjgsImV4cCI6MjA2ODg3Mjc2OH0.NxetXJoCLh4q9zAqn_olimziI3YP4MAJzB8ed4qf8cg';
+            let supabaseProjeto2;
+            // ***** FIM DA NOVA CONFIGURAÇÃO *****
+
             // ================================================================
             // 2. COMPONENTES AUXILIARES (Helpers)
             // ================================================================
+            async function verificarEGerarAlertaDeEncerramento(placa, periodo) {
+                if (!supabaseProjeto2 || !placa) return;
+
+                try {
+                    const { data: alertaExistente, error: checkError } = await supabase
+                        .from('alertas')
+                        .select('id')
+                        .eq('placa', placa)
+                        .eq('tipo_alerta', 'Placa com cadastro encerrado na base de equipamentos')
+                        .maybeSingle();
+
+                    if (checkError) throw checkError;
+                    if (alertaExistente) return; 
+
+                    const { data, error } = await supabaseProjeto2
+                        .from('equipamentos')
+                        .select('status')
+                        .eq('plate', placa)
+                        .maybeSingle();
+
+                    if (error) throw new Error(`Erro ao consultar a placa no segundo projeto: ${error.message}`);
+                    
+                    if (data && data.status !== 'Ativo') { // <-- AJUSTE A CONDIÇÃO AQUI CONFORME SUA BASE
+                        await supabase
+                            .from('alertas')
+                            .insert([{ 
+                                placa: placa,
+                                periodo: periodo,
+                                tipo_alerta: 'Placa com cadastro encerrado na base de equipamentos',
+                                status: 'pendente'
+                            }]);
+                    }
+                } catch (err) {
+                    console.error('Erro na verificação de encerramento de placa:', err);
+                }
+            }
+
             function LucideIcon({ name, className }) {
                 return React.createElement('span', {
                     className: className,
@@ -85,7 +130,6 @@
                 const inputRef = React.useRef(null);
                 React.useEffect(() => {
                     if (!inputRef.current) return;
-
                     const fp = flatpickr(inputRef.current, {
                         mode: 'range',
                         dateFormat: "Y-m-d",
@@ -100,12 +144,8 @@
                             }
                         },
                     });
-
-                    return () => {
-                        fp.destroy();
-                    };
+                    return () => fp.destroy();
                 }, [onDatesChange]);
-
                 return React.createElement('div', { className: "relative w-full" },
                     React.createElement('div', { className: "absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none" },
                         React.createElement(LucideIcon, { name: "CalendarDays", className: "h-5 w-5 text-gray-400" })
@@ -134,7 +174,7 @@
             // ================================================================
             // 3. COMPONENTES DE PÁGINA (Módulos)
             // ================================================================
-            
+
             function LoginPage({ onLogin }) {
                 const [usuario, setUsuario] = React.useState('');
                 const [senha, setSenha] = React.useState('');
@@ -151,7 +191,6 @@
                             .eq('usuario', usuario.toLowerCase())
                             .eq('senha', senha)
                             .single();
-                        
                         if (fetchError || !data) {
                             setError('Usuário ou senha inválidos.');
                         } else {
@@ -191,8 +230,6 @@
                     )
                 );
             }
-            
-            /* INÍCIO DO NOVO COMPONENTE Alertas */
 
             function Alertas({ user, showToast }) {
                 const [alertas, setAlertas] = React.useState([]);
@@ -293,14 +330,12 @@
                     React.createElement('h2', { className: "text-2xl font-bold text-gray-800 mb-6 text-center" }, "Painel de Alertas"),
 
                     React.createElement('div', { className: "grid grid-cols-1 lg:grid-cols-2 gap-8" },
-                        // Coluna de Pendentes
                         React.createElement('div', null,
                             React.createElement('h3', { className: 'text-lg font-semibold mb-4 text-yellow-600' }, `Pendentes (${alertasPendentes.length})`),
                             isLoading && alertasPendentes.length === 0 ? React.createElement('p', null, 'Carregando...') :
                             alertasPendentes.length === 0 ? React.createElement('p', { className: 'text-sm text-gray-500' }, 'Nenhuma tarefa pendente.') :
                             React.createElement('div', { className: 'space-y-4' }, alertasPendentes.map(alerta => React.createElement(AlertCard, { key: alerta.id, alerta: alerta })))
                         ),
-                        // Coluna de Concluídos
                         React.createElement('div', null,
                             React.createElement('h3', { className: 'text-lg font-semibold mb-4 text-green-600' }, `Concluídas (${alertasConcluidos.length})`),
                              isLoading && alertasConcluidos.length === 0 ? React.createElement('p', null, 'Carregando...') :
@@ -310,8 +345,6 @@
                     )
                 );
             }
-            
-            /* FIM DO NOVO COMPONENTE */
 
             function Dashboard({ user, showToast }) {
                 return React.createElement('div', { className: "bg-white p-6 rounded-xl shadow-lg" },
@@ -319,8 +352,1168 @@
                     React.createElement('p', null, "Dashboard com os últimos abastecimentos de cada origem (em desenvolvimento).")
                 );
             }
-            
-            // ... (restante dos seus componentes de página existentes) ...
+
+            function MapeamentoCombustivel({ user, showToast }) {
+                const [regras, setRegras] = React.useState([]);
+                const [isLoading, setIsLoading] = React.useState(true);
+                const [showForm, setShowForm] = React.useState(false);
+                const initialFormState = { nome_original: '', nome_padronizado: '', plataforma: '' };
+                const [formData, setFormData] = React.useState(initialFormState);
+                const fetchRegras = React.useCallback(async () => {
+                    setIsLoading(true);
+                    try {
+                        const { data, error } = await supabase.from('combustivel_mapeamento').select('*').order('nome_padronizado');
+                        if (error) throw error;
+                        setRegras(data || []);
+                    } catch (err) {
+                        showToast("Erro ao carregar regras de mapeamento.", "error");
+                    }
+                    setIsLoading(false);
+                }, [showToast]);
+                React.useEffect(() => {
+                    fetchRegras();
+                }, [fetchRegras]);
+                const handleInputChange = (e) => {
+                    setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+                };
+                const handleFormSubmit = async (e) => {
+                    e.preventDefault();
+                    if (!formData.nome_original.trim() || !formData.nome_padronizado.trim()) {
+                        showToast("Os campos 'Nome Original' e 'Nome Padronizado' são obrigatórios.", "error");
+                        return;
+                    }
+                    setIsLoading(true);
+                    try {
+                        const record = {
+                            nome_original: formData.nome_original.trim(),
+                            nome_padronizado: formData.nome_padronizado.trim(),
+                            plataforma: formData.plataforma.trim() || null,
+                            usuario_criacao: user.nome,
+                        };
+                        const { error } = await supabase.from('combustivel_mapeamento').insert([record]);
+                        if (error) throw error;
+                        showToast("Regra de mapeamento criada com sucesso!", "success");
+                        setShowForm(false);
+                        setFormData(initialFormState);
+                        fetchRegras();
+                    } catch (err) {
+                        showToast(`Erro ao salvar: ${err.message}`, "error");
+                    }
+                    setIsLoading(false);
+                };
+                return React.createElement('div', { className: "bg-white p-6 rounded-xl shadow-lg" },
+                    React.createElement('h2', { className: "text-2xl font-bold text-gray-800 mb-6 text-center" }, "Mapeamento de Combustível (DE/PARA)"),
+                    !showForm && React.createElement('div', { className: 'flex justify-center mb-6' },
+                        React.createElement('button', {
+                            onClick: () => { setShowForm(true); setFormData(initialFormState); },
+                            className: "p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center"
+                        }, React.createElement(LucideIcon, { name: 'PlusCircle', className: 'mr-2 h-5 w-5' }), "Nova Regra")
+                    ),
+                    showForm && React.createElement('form', { onSubmit: handleFormSubmit, className: "grid grid-cols-1 md:grid-cols-3 gap-4 mb-8 p-4 border rounded-lg bg-gray-50" },
+                        React.createElement('input', { name: "nome_original", value: formData.nome_original, onChange: handleInputChange, placeholder: "Nome na Planilha (DE)*", className: "p-2 border rounded" }),
+                        React.createElement('input', { name: "nome_padronizado", value: formData.nome_padronizado, onChange: handleInputChange, placeholder: "Nome Padrão (PARA)*", className: "p-2 border rounded" }),
+                        React.createElement('input', { name: "plataforma", value: formData.plataforma, onChange: handleInputChange, placeholder: "Plataforma (Ex: Ticket)", className: "p-2 border rounded" }),
+                        React.createElement('div', { className: "md:col-span-3 flex justify-end gap-4" },
+                            React.createElement('button', { type: "button", onClick: () => setShowForm(false), className: "py-2 px-4 bg-gray-300 rounded-lg" }, "Cancelar"),
+                            React.createElement('button', { type: "submit", className: "py-2 px-4 bg-blue-600 text-white rounded-lg", disabled: isLoading }, isLoading ? 'Salvando...' : 'Salvar')
+                        )
+                    ),
+                    React.createElement('div', { className: "rounded-lg border border-slate-200 shadow-sm overflow-hidden" },
+                        React.createElement('table', { className: "w-full text-sm text-left text-slate-600" },
+                            React.createElement('thead', { className: "text-xs text-slate-700 uppercase bg-slate-100" },
+                                React.createElement('tr', null,
+                                    ["Nome na Planilha (DE)", "Nome Padrão (PARA)", "Plataforma"].map(h => 
+                                        React.createElement('th', { key: h, className: "px-6 py-4 font-semibold border-b border-r border-slate-200 last:border-r-0" }, h)
+                                    )
+                                )
+                            ),
+                            React.createElement('tbody', null,
+                                isLoading ? React.createElement('tr', null, React.createElement('td', { colSpan: 3, className: "p-4 text-center" }, "Carregando...")) :
+                                regras.map(item => React.createElement('tr', { key: item.id, className: "hover:bg-blue-50 even:bg-slate-50" },
+                                    React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, item.nome_original),
+                                    React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, React.createElement('span', { className: 'font-medium text-slate-800' }, item.nome_padronizado)),
+                                    React.createElement('td', { className: "px-6 py-4" }, item.plataforma)
+                                ))
+                            )
+                        )
+                    )
+                );
+            }
+
+            function CtaCarregamentos({ user, showToast }) {
+                const [carregamentos, setCarregamentos] = React.useState([]);
+                const [isLoading, setIsLoading] = React.useState(false);
+                const [showForm, setShowForm] = React.useState(false);
+                const initialFormState = { cod_posto: '', volume: '', custo: '', preco_por_litro: '', nota_fiscal: '', fornecedor: '', entrega: '' };
+                const [formData, setFormData] = React.useState(initialFormState);
+                const [file, setFile] = React.useState(null);
+                const [isImporting, setIsImporting] = React.useState(false);
+                const [filters, setFilters] = React.useState({ searchTerm: '', data_inicio: null, data_fim: null });
+                const formatDate = (dateString) => {
+                    if (!dateString) return '—';
+                    if (typeof dateString === 'number' && dateString > 1) {
+                        const date = new Date(Math.round((dateString - 25569) * 86400 * 1000));
+                        return date.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+                    }
+                    const date = new Date(dateString.includes('T') ? dateString : dateString + 'T00:00:00');
+                    return date.toLocaleDateString('pt-BR');
+                };
+                const handleInputChange = (e) => { setFormData(prev => ({ ...prev, [e.target.name]: e.target.value })); };
+                const handleFilterChange = (e) => { setFilters(prev => ({ ...prev, [e.target.name]: e.target.value })); };
+                const handleFileChange = (e) => { if (e.target.files && e.target.files[0]) { setFile(e.target.files[0]); } };
+                const handleFormSubmit = async (e) => {
+                    e.preventDefault();
+                    setIsLoading(true);
+                    try {
+                        const recordToInsert = {
+                            ...formData,
+                            custo: parseFloat(formData.custo),
+                            volume: parseFloat(formData.volume),
+                            preco_por_litro: parseFloat(formData.preco_por_litro),
+                            usuario_criacao: user.nome,
+                            data_criacao: new Date().toISOString(),
+                        };
+                        const { error } = await supabase.from('cta_carregamentos').insert([recordToInsert]);
+                        if (error) throw error;
+                        showToast("Carregamento registrado com sucesso!", "success");
+                        setFormData(initialFormState);
+                        setShowForm(false);
+                    } catch (err) {
+                        showToast(`Erro ao registrar carregamento: ${err.message}`, "error");
+                    }
+                    setIsLoading(false);
+                };
+                const handleImport = () => {
+                    if (!file) { showToast("Por favor, selecione um arquivo para importar.", "error"); return; }
+                    setIsImporting(true);
+                    const reader = new FileReader();
+                    reader.onload = async (e) => {
+                        try {
+                            const data = new Uint8Array(e.target.result);
+                            const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+                            const sheetName = workbook.SheetNames[0];
+                            const worksheet = workbook.Sheets[sheetName];
+                            const json = XLSX.utils.sheet_to_json(worksheet);
+                            const dataToInsert = json.map(row => {
+                                let deliveryDate = null;
+                                const excelDate = row['Entrega'];
+                                if (excelDate) {
+                                    if (excelDate instanceof Date) { deliveryDate = excelDate.toISOString().split('T')[0]; }
+                                    else if (typeof excelDate === 'string' && excelDate.includes('/')) {
+                                        const parts = excelDate.split('/');
+                                        if (parts.length === 3) { deliveryDate = `${parts[2]}-${parts[1]}-${parts[0]}`; }
+                                    }
+                                }
+                                return {
+                                    cod_posto: row['Cod Posto'],
+                                    volume: parseFloat(row['Volume']) || 0,
+                                    custo: parseFloat(row['Custo']) || 0,
+                                    preco_por_litro: parseFloat(row['Preço p/ Litro']) || 0,
+                                    nota_fiscal: row['Nota Fiscal'],
+                                    fornecedor: row['Fornecedor'],
+                                    entrega: deliveryDate,
+                                    usuario_criacao: user.nome,
+                                    data_criacao: new Date().toISOString(),
+                                };
+                            });
+                            if (dataToInsert.length === 0) { showToast("Nenhum dado válido encontrado na planilha.", "info"); setIsImporting(false); return; }
+                            const { error } = await supabase.from('cta_carregamentos').insert(dataToInsert);
+                            if (error) { console.error("Erro do Supabase:", error); throw error; }
+                            showToast(`${dataToInsert.length} registros importados com sucesso!`, "success");
+                            setFile(null);
+                            document.getElementById('file-input-cta-carreg').value = '';
+                            setCarregamentos([]);
+                        } catch (err) {
+                            showToast(`Erro ao processar o arquivo: ${err.message}`, "error");
+                        }
+                        setIsImporting(false);
+                    };
+                    reader.readAsArrayBuffer(file);
+                };
+                const handleSearch = async () => {
+                    setIsLoading(true);
+                    try {
+                        let query = supabase.from('cta_carregamentos').select('*');
+                        if (filters.searchTerm) { query = query.or(`nota_fiscal.ilike.%${filters.searchTerm.trim()}%,fornecedor.ilike.%${filters.searchTerm.trim()}%`); }
+                        if (filters.data_inicio) {
+                            query = query.gte('entrega', filters.data_inicio.toISOString());
+                        }
+                        if (filters.data_fim) {
+                            const endDate = new Date(filters.data_fim);
+                            endDate.setHours(23, 59, 59, 999);
+                            query = query.lte('entrega', endDate.toISOString());
+                        }
+                        query = query.order('entrega', { ascending: false });
+                        const { data, error } = await query;
+                        if (error) throw error;
+                        setCarregamentos(data || []);
+                    } catch (err) {
+                        showToast("Erro ao buscar carregamentos.", "error");
+                    }
+                    setIsLoading(false);
+                };
+                React.useEffect(() => {
+                    const fetchInitialData = async () => {
+                        setIsLoading(true);
+                        try {
+                            const { data, error } = await supabase.from('cta_carregamentos').select('*').order('entrega', { ascending: false }).limit(100);
+                            if (error) throw error;
+                            setCarregamentos(data || []);
+                        } catch (err) {
+                            showToast("Erro ao carregar dados iniciais.", "error");
+                        }
+                        setIsLoading(false);
+                    };
+                    fetchInitialData();
+                }, [showToast]);
+                return React.createElement('div', { className: "bg-white p-6 rounded-xl shadow-lg" },
+                    React.createElement('h2', { className: "text-2xl font-bold text-gray-800 mb-6 text-center" }, "CTA Carregamentos"),
+                    React.createElement('div', { className: "flex justify-end mb-4" },
+                        React.createElement('button', { onClick: () => setShowForm(!showForm), className: "p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center" }, React.createElement(LucideIcon, { name: 'PlusCircle', className: 'mr-2 h-5 w-5' }), showForm ? "Fechar Formulário" : "Novo Carregamento")
+                    ),
+                    showForm && React.createElement('form', { onSubmit: handleFormSubmit, className: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8 p-4 border rounded-lg bg-gray-50" },
+                        React.createElement('input', { name: "cod_posto", value: formData.cod_posto, onChange: handleInputChange, placeholder: "Cód. Posto", className: "p-2 border rounded" }),
+                        React.createElement('input', { name: "volume", type: "number", step: "0.01", value: formData.volume, onChange: handleInputChange, placeholder: "Volume", className: "p-2 border rounded" }),
+                        React.createElement('input', { name: "custo", type: "number", step: "0.01", value: formData.custo, onChange: handleInputChange, placeholder: "Custo Total", className: "p-2 border rounded" }),
+                        React.createElement('input', { name: "preco_por_litro", type: "number", step: "0.001", value: formData.preco_por_litro, onChange: handleInputChange, placeholder: "Preço p/ Litro", className: "p-2 border rounded" }),
+                        React.createElement('input', { name: "nota_fiscal", value: formData.nota_fiscal, onChange: handleInputChange, placeholder: "Nota Fiscal", className: "p-2 border rounded" }),
+                        React.createElement('input', { name: "fornecedor", value: formData.fornecedor, onChange: handleInputChange, placeholder: "Fornecedor", className: "p-2 border rounded" }),
+                        React.createElement('div', null, React.createElement('label', { htmlFor: 'entrega', className: 'text-xs text-gray-500' }, 'Data da Entrega'), React.createElement('input', { name: "entrega", id: 'entrega', type: "date", value: formData.entrega, onChange: handleInputChange, className: "w-full p-2 border rounded" })),
+                        React.createElement('div', { className: "lg:col-span-4 flex justify-end gap-4" },
+                            React.createElement('button', { type: "button", onClick: () => setShowForm(false), className: "py-2 px-4 bg-gray-300 rounded-lg" }, "Cancelar"),
+                            React.createElement('button', { type: "submit", className: "py-2 px-4 bg-blue-600 text-white rounded-lg", disabled: isLoading }, isLoading ? 'Salvando...' : 'Salvar')
+                        )
+                    ),
+                    React.createElement('div', { className: "mb-8 p-4 border rounded-lg bg-gray-100 grid grid-cols-1 md:grid-cols-2 gap-4 items-end" },
+                        React.createElement('div', null,
+                            React.createElement('label', { htmlFor: 'file-input-cta-carreg', className: "block text-sm font-medium text-gray-700 mb-1" }, "Importar Planilha (.xlsx, .xls, .csv)"),
+                            React.createElement('input', { id: 'file-input-cta-carreg', type: "file", onChange: handleFileChange, className: "w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100", accept: ".xlsx, .xls, .csv" })
+                        ),
+                        React.createElement('button', { onClick: handleImport, disabled: isImporting, className: "w-full p-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 transition" }, isImporting ? 'Importando...' : 'Importar Dados')
+                    ),
+                    React.createElement('div', { className: "mb-6 p-4 border rounded-lg bg-gray-50 grid grid-cols-1 md:grid-cols-3 gap-4 items-end" },
+                        React.createElement('div', { className: 'md:col-span-2' },
+                            React.createElement(DateRangePicker, {
+                                onDatesChange: (dates) => {
+                                    setFilters(prev => ({ ...prev, data_inicio: dates[0] || null, data_fim: dates[1] || null }));
+                                }
+                            })
+                        ),
+                        React.createElement('div', null,
+                            React.createElement('label', { className: "block text-sm font-medium" }, "Nota Fiscal ou Fornecedor"),
+                            React.createElement('input', { type: "text", name: "searchTerm", value: filters.searchTerm, onChange: handleFilterChange, className: "mt-1 w-full p-2 border rounded" })
+                        ),
+                        React.createElement('button', { onClick: handleSearch, disabled: isLoading, className: "w-full p-2 bg-blue-600 text-white rounded-lg md:col-start-3" }, 'Buscar')
+                    ),
+                    React.createElement('div', { className: "rounded-lg border border-slate-200 shadow-sm overflow-hidden" },
+                        React.createElement('table', { className: "w-full text-sm text-left text-slate-600" },
+                            React.createElement('thead', { className: "text-xs text-slate-700 uppercase bg-slate-100" },
+                                React.createElement('tr', null,
+                                    ["Cód. Posto", "Volume (L)", "Custo Total", "Preço p/ Litro", "Nota Fiscal", "Fornecedor", "Data Entrega"].map(h => React.createElement('th', { key: h, className: "px-6 py-4 font-semibold border-b border-r border-slate-200 last:border-r-0" }, h))
+                                )
+                            ),
+                            React.createElement('tbody', null,
+                                isLoading ? React.createElement('tr', null, React.createElement('td', { colSpan: 7, className: "p-4 text-center" }, "Carregando...")) :
+                                carregamentos.length === 0 ? React.createElement('tr', null, React.createElement('td', { colSpan: 7, className: "p-6 text-center text-slate-500" }, "Nenhum carregamento encontrado.")) :
+                                carregamentos.map(c => React.createElement('tr', { key: c.id, className: "hover:bg-blue-50 even:bg-slate-50" },
+                                    React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, c.cod_posto),
+                                    React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, c.volume),
+                                    React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, `R$ ${(c.custo || 0).toFixed(2).replace('.', ',')}`),
+                                    React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, `R$ ${(c.preco_por_litro || 0).toFixed(3).replace('.', ',')}`),
+                                    React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, React.createElement('span', { className: 'font-medium text-slate-800' }, c.nota_fiscal)),
+                                    React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, c.fornecedor),
+                                    React.createElement('td', { className: "px-6 py-4" }, formatDate(c.entrega))
+                                ))
+                            )
+                        )
+                    )
+                );
+            }
+
+            function CtaAbastecimentos({ user, showToast }) {
+                const [abastecimentos, setAbastecimentos] = React.useState([]);
+                const [isLoading, setIsLoading] = React.useState(false);
+                const [showForm, setShowForm] = React.useState(false);
+                const initialFormState = { data_hora_inicio: '', placa: '', volume: '', custo_total: '', cod_posto: '', cod_frentista: '' };
+                const [formData, setFormData] = React.useState(initialFormState);
+                const [file, setFile] = React.useState(null);
+                const [isImporting, setIsImporting] = React.useState(false);
+                const [filters, setFilters] = React.useState({ placa: '', data_inicio: null, data_fim: null, cod_posto: '' });
+                const [hasSearched, setHasSearched] = React.useState(false);
+                const formatDate = (dateString) => {
+                    if (!dateString) return '—';
+                    return new Date(dateString).toLocaleString('pt-BR');
+                };
+                const handleFilterChange = (e) => {
+                    setFilters(prev => ({ ...prev, [e.target.name]: e.target.value }));
+                };
+                const handleSearch = async () => {
+                    setHasSearched(true);
+                    setIsLoading(true);
+                    try {
+                        let query = supabase.from('cta_abastecimentos').select('*');
+                        if (filters.placa) query = query.ilike('placa', `%${filters.placa.trim()}%`);
+                        if (filters.cod_posto) query = query.eq('cod_posto', filters.cod_posto.trim());
+                        if (filters.data_inicio) {
+                            query = query.gte('data_hora_inicio', filters.data_inicio.toISOString());
+                        }
+                        if (filters.data_fim) {
+                            const endDate = new Date(filters.data_fim);
+                            endDate.setHours(23, 59, 59, 999);
+                            query = query.lte('data_hora_inicio', endDate.toISOString());
+                        }
+                        query = query.order('data_hora_inicio', { ascending: false });
+                        const { data, error } = await query;
+                        if (error) throw error;
+                        setAbastecimentos(data || []);
+                    } catch (err) {
+                        showToast("Erro ao buscar abastecimentos.", "error");
+                    }
+                    setIsLoading(false);
+                };
+                const handleInputChange = (e) => { setFormData(prev => ({ ...prev, [e.target.name]: e.target.value })); };
+                const handleFileChange = (e) => { if (e.target.files && e.target.files[0]) { setFile(e.target.files[0]); }};
+                const handleFormSubmit = async (e) => {
+                    e.preventDefault();
+                    setIsLoading(true);
+                    try {
+                        const recordToInsert = {
+                            ...formData,
+                            custo_total: parseFloat(formData.custo_total),
+                            volume: parseFloat(formData.volume),
+                            usuario_criacao: user.nome,
+                            data_criacao: new Date().toISOString(),
+                        };
+                        const { error } = await supabase.from('cta_abastecimentos').insert([recordToInsert]);
+                        if (error) throw error;
+                        showToast("Abastecimento registrado com sucesso!", "success");
+                        setFormData(initialFormState);
+                        setShowForm(false);
+                        setHasSearched(false);
+                        setAbastecimentos([]);
+                    } catch (err) {
+                        showToast(`Erro ao registrar: ${err.message}`, "error");
+                    }
+                    setIsLoading(false);
+                };
+                const handleImport = () => {
+                    if (!file) { return showToast("Por favor, selecione um arquivo.", "error"); }
+                    setIsImporting(true);
+                    const reader = new FileReader();
+                    reader.onload = async (e) => {
+                        try {
+                            const data = new Uint8Array(e.target.result);
+                            const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+                            const sheetName = workbook.SheetNames[0];
+                            const worksheet = workbook.Sheets[sheetName];
+                            const json = XLSX.utils.sheet_to_json(worksheet);
+                            const dataToInsert = json.slice(0, -1).map(row => {
+                                const excelDate = row['Data/Hora início'];
+                                let finalDate = null;
+                                if (excelDate) {
+                                    let d;
+                                    if (excelDate instanceof Date) { d = excelDate; }
+                                    else if (typeof excelDate === 'number' && excelDate > 1) { d = new Date(Math.round((excelDate - 25569) * 86400 * 1000)); }
+                                    else if (typeof excelDate === 'string') {
+                                        const parts = excelDate.match(/(\d+)/g);
+                                        if (parts && parts.length >= 5) { d = new Date(parts[2], parts[1] - 1, parts[0], parts[3], parts[4], parts[5] || 0); }
+                                    }
+                                    if (d && !isNaN(d.getTime())) { finalDate = d.toISOString(); }
+                                }
+                                return {
+                                    data_hora_inicio: finalDate,
+                                    placa: row['Placa'],
+                                    volume: parseFloat(row['Volume (l)']) || 0,
+                                    custo_total: parseFloat(row['Custo Total (R$)']) || 0,
+                                    cod_posto: row['Cod. do Posto'],
+                                    cod_frentista: row['Cod. do Frentista'],
+                                    usuario_criacao: user.nome,
+                                    data_criacao: new Date().toISOString(),
+                                };
+                            });
+                            if (dataToInsert.length === 0) {
+                                showToast("Nenhum dado válido encontrado na planilha.", "info");
+                                setIsImporting(false);
+                                return;
+                            }
+                            const { error } = await supabase.from('cta_abastecimentos').insert(dataToInsert, { returning: 'minimal' });
+                            if (error) { console.error("Erro do Supabase:", error); throw error; }
+                            showToast(`${dataToInsert.length} registros importados com sucesso!`, "success");
+                            setFile(null); 
+                            document.getElementById('file-input-cta-abs').value = '';
+                            setHasSearched(false);
+                            setAbastecimentos([]);
+                        } catch (err) {
+                            showToast(`Erro ao processar o arquivo: ${err.message}`, "error");
+                        }
+                        setIsImporting(false);
+                    };
+                    reader.readAsArrayBuffer(file);
+                };
+                return React.createElement('div', { className: "bg-white p-6 rounded-xl shadow-lg" },
+                    React.createElement('div', { className: "flex justify-between items-center mb-6" },
+                        React.createElement('h2', { className: "text-2xl font-bold text-gray-800" }, "CTA Abastecimentos"),
+                        React.createElement('button', { onClick: () => setShowForm(!showForm), className: "p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center" }, 
+                            React.createElement(LucideIcon, { name: 'PlusCircle', className: 'mr-2 h-5 w-5' }),
+                            showForm ? "Fechar Formulário" : "Novo Abastecimento"
+                        )
+                    ),
+                    showForm && React.createElement('form', { onSubmit: handleFormSubmit, className: "grid grid-cols-1 md:grid-cols-3 gap-4 mb-8 p-4 border rounded-lg bg-gray-50" },
+                        React.createElement('input', { name: "placa", value: formData.placa, onChange: handleInputChange, placeholder: "Placa", className: "p-2 border rounded" }),
+                        React.createElement('input', { name: "cod_posto", value: formData.cod_posto, onChange: handleInputChange, placeholder: "Cód. Posto", className: "p-2 border rounded" }),
+                        React.createElement('input', { name: "cod_frentista", value: formData.cod_frentista, onChange: handleInputChange, placeholder: "Cód. Frentista", className: "p-2 border rounded" }),
+                        React.createElement('input', { name: "volume", type: "number", step: "0.01", value: formData.volume, onChange: handleInputChange, placeholder: "Volume (l)", className: "p-2 border rounded" }),
+                        React.createElement('input', { name: "custo_total", type: "number", step: "0.01", value: formData.custo_total, onChange: handleInputChange, placeholder: "Custo Total (R$)", className: "p-2 border rounded" }),
+                        React.createElement('input', { name: "data_hora_inicio", type: "datetime-local", value: formData.data_hora_inicio, onChange: handleInputChange, className: "p-2 border rounded" }),
+                        React.createElement('div', { className: "md:col-span-3 flex justify-end gap-4" },
+                            React.createElement('button', { type: "button", onClick: () => setShowForm(false), className: "py-2 px-4 bg-gray-300 rounded-lg" }, "Cancelar"),
+                            React.createElement('button', { type: "submit", className: "py-2 px-4 bg-blue-600 text-white rounded-lg", disabled: isLoading }, isLoading ? 'Salvando...' : 'Salvar')
+                        )
+                    ),
+                    React.createElement('div', { className: "mb-8 p-4 border rounded-lg bg-gray-100 grid grid-cols-1 md:grid-cols-2 gap-4 items-end" },
+                        React.createElement('div', null,
+                            React.createElement('label', { htmlFor: 'file-input-cta-abs', className: "block text-sm font-medium text-gray-700 mb-1" }, "Importar Planilha"),
+                            React.createElement('input', { id: 'file-input-cta-abs', type: "file", onChange: handleFileChange, className: "w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100", accept: ".xlsx, .xls, .csv" })
+                        ),
+                        React.createElement('button', { onClick: handleImport, disabled: isImporting, className: "w-full p-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 transition" }, isImporting ? 'Importando...' : 'Importar Dados')
+                    ),
+                    React.createElement('div', { className: "mb-6 p-4 border rounded-lg bg-gray-50 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end" },
+                        React.createElement('div', { className: "lg:col-span-2" },
+                            React.createElement(DateRangePicker, {
+                                onDatesChange: (dates) => {
+                                    setFilters(prev => ({ ...prev, data_inicio: dates[0] || null, data_fim: dates[1] || null }));
+                                }
+                            })
+                        ),
+                        React.createElement('div', null, React.createElement('label', { className: "block text-sm font-medium" }, "Placa"), React.createElement('input', { type: "text", name: "placa", value: filters.placa, onChange: handleFilterChange, className: "mt-1 w-full p-2 border rounded" })),
+                        React.createElement('div', null, React.createElement('label', { className: "block text-sm font-medium" }, "Cód. do Posto"), React.createElement('input', { type: "text", name: "cod_posto", value: filters.cod_posto, onChange: handleFilterChange, className: "mt-1 w-full p-2 border rounded" })),
+                        React.createElement('button', { onClick: handleSearch, disabled: isLoading, className: "w-full p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition lg:col-start-4" }, 'Buscar')
+                    ),
+                    React.createElement('div', { className: "rounded-lg border border-slate-200 shadow-sm overflow-hidden" },
+                        React.createElement('table', { className: "w-full text-sm text-left text-slate-600" },
+                            React.createElement('thead', { className: "text-xs text-slate-700 uppercase bg-slate-100" },
+                                React.createElement('tr', null,
+                                    ["Data/Hora", "Placa", "Volume (l)", "Custo Total", "Cód. Posto"].map(h => React.createElement('th', { key: h, className: "px-6 py-4 font-semibold border-b border-r border-slate-200 last:border-r-0" }, h))
+                                )
+                            ),
+                            React.createElement('tbody', null,
+                                isLoading ? React.createElement('tr', null, React.createElement('td', { colSpan: 5, className: "p-4 text-center" }, "Carregando...")) :
+                                !hasSearched ? React.createElement('tr', null, React.createElement('td', { colSpan: 5, className: "p-6 text-center text-slate-500" }, "Utilize os filtros para buscar os abastecimentos.")) :
+                                abastecimentos.length === 0 ? React.createElement('tr', null, React.createElement('td', { colSpan: 5, className: "p-6 text-center text-slate-500" }, "Nenhum resultado encontrado.")) :
+                                abastecimentos.map(item => React.createElement('tr', { key: item.id, className: "hover:bg-blue-50 even:bg-slate-50" },
+                                    React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, formatDate(item.data_hora_inicio)),
+                                    React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, React.createElement('span', { className: 'font-medium text-slate-800' }, item.placa)),
+                                    React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, item.volume),
+                                    React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, `R$ ${(item.custo_total || 0).toFixed(2).replace('.', ',')}`),
+                                    React.createElement('td', { className: "px-6 py-4" }, item.cod_posto)
+                                ))
+                            )
+                        )
+                    )
+                );
+            }
+
+            function TicketAbastecimentos({ user, showToast }) {
+                const [abastecimentos, setAbastecimentos] = React.useState([]);
+                const [isLoading, setIsLoading] = React.useState(false);
+                const [file, setFile] = React.useState(null);
+                const [isImporting, setIsImporting] = React.useState(false);
+                const [filters, setFilters] = React.useState({ placa: '', data_inicio: null, data_fim: null, cidade: '', nome_estabelecimento: '' });
+                const [hasSearched, setHasSearched] = React.useState(false);
+                const [combustivelMap, setCombustivelMap] = React.useState(new Map());
+                React.useEffect(() => {
+                    const fetchMapping = async () => {
+                        const { data, error } = await supabase.from('combustivel_mapeamento').select('nome_original, nome_padronizado');
+                        if (error) {
+                            showToast("Aviso: Não foi possível carregar as regras de mapeamento de combustível.", "error");
+                        } else {
+                            const map = new Map(data.map(rule => [rule.nome_original, rule.nome_padronizado]));
+                            setCombustivelMap(map);
+                        }
+                    };
+                    fetchMapping();
+                }, [showToast]);
+                const formatDate = (dateString) => {
+                    if (!dateString) return '—';
+                    return new Date(dateString).toLocaleString('pt-BR');
+                };
+                const handleFilterChange = (e) => {
+                    setFilters(prev => ({ ...prev, [e.target.name]: e.target.value }));
+                };
+                const handleSearch = async () => {
+                    setHasSearched(true);
+                    setIsLoading(true);
+                    try {
+                        let query = supabase.from('ticket_abastecimentos').select('*');
+                        if (filters.placa) query = query.ilike('placa', `%${filters.placa.trim()}%`);
+                        if (filters.cidade) query = query.ilike('cidade', `%${filters.cidade.trim()}%`);
+                        if (filters.nome_estabelecimento) query = query.ilike('nome_estabelecimento', `%${filters.nome_estabelecimento.trim()}%`);
+                        if (filters.data_inicio) {
+                            query = query.gte('data_transacao', filters.data_inicio.toISOString());
+                        }
+                        if (filters.data_fim) {
+                            const endDate = new Date(filters.data_fim);
+                            endDate.setHours(23, 59, 59, 999);
+                            query = query.lte('data_transacao', endDate.toISOString());
+                        }
+                        query = query.order('data_transacao', { ascending: false });
+                        const { data, error } = await query;
+                        if (error) throw error;
+                        setAbastecimentos(data || []);
+                    } catch (err) {
+                        showToast("Erro ao buscar abastecimentos.", "error");
+                    }
+                    setIsLoading(false);
+                };
+                const handleFileChange = (e) => {
+                    if (e.target.files && e.target.files[0]) {
+                        setFile(e.target.files[0]);
+                    }
+                };
+                const handleImport = () => {
+                    if (!file) { return showToast("Por favor, selecione um arquivo.", "error"); }
+                    setIsImporting(true);
+                    const reader = new FileReader();
+                    reader.onload = async (e) => {
+                        try {
+                            const data = new Uint8Array(e.target.result);
+                            const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+                            const sheetName = workbook.SheetNames[0];
+                            const worksheet = workbook.Sheets[sheetName];
+                            const json = XLSX.utils.sheet_to_json(worksheet);
+                            const dataToInsert = json.slice(0, -1).map(row => {
+                                const transacaoDate = row['DATA TRANSACAO'];
+                                let finalDate = null;
+                                if (transacaoDate) {
+                                    const d = new Date(transacaoDate);
+                                    if (!isNaN(d.getTime())) { finalDate = d.toISOString(); }
+                                }
+                                const originalCombustivel = row['TIPO COMBUSTIVEL'];
+                                const padronizadoCombustivel = combustivelMap.get(originalCombustivel) || originalCombustivel;
+                                return {
+                                    codigo_transacao: row['CODIGO TRANSACAO'],
+                                    servico: row['SERVICO'],
+                                    data_transacao: finalDate,
+                                    placa: row['PLACA'],
+                                    tipo_combustivel: padronizadoCombustivel,
+                                    litros: parseFloat(row['LITROS']) || 0,
+                                    vl_litro: parseFloat(row['VL/LITRO']) || 0,
+                                    valor_emissao: parseFloat(row['VALOR EMISSAO']) || 0,
+                                    nome_estabelecimento: row['NOME ESTABELECIMENTO'],
+                                    cidade: row['CIDADE'],
+                                    uf: row['UF'],
+                                    info_adicional1: row['INFORMACAO ADICIONAL 1'],
+                                    numero_cartao: row['NUMERO CARTAO'],
+                                    usuario_criacao: user.nome,
+                                    data_criacao: new Date().toISOString(),
+                                };
+                            });
+                            if (dataToInsert.length === 0) {
+                                showToast("Nenhum dado válido encontrado na planilha (ignorando a linha de total).", "info");
+                                setIsImporting(false);
+                                return;
+                            }
+                            const { error } = await supabase.from('ticket_abastecimentos').insert(dataToInsert, { returning: 'minimal' });
+                            if (error) { console.error("Erro do Supabase:", error); throw error; }
+
+                            for (const item of dataToInsert) {
+                                if(item.placa && item.data_transacao) {
+                                    const periodo = new Date(item.data_transacao).toLocaleDateString('pt-BR', { month: '2-digit', year: 'numeric' });
+                                    await verificarEGerarAlertaDeEncerramento(item.placa, periodo);
+                                }
+                            }
+
+                            showToast(`${dataToInsert.length} registros importados com sucesso!`, "success");
+                            setFile(null); 
+                            document.getElementById('file-input-ticket').value = '';
+                            setHasSearched(false);
+                            setAbastecimentos([]);
+                        } catch (err) {
+                            showToast(`Erro ao processar o arquivo: ${err.message}`, "error");
+                        }
+                        setIsImporting(false);
+                    };
+                    reader.readAsArrayBuffer(file);
+                };
+                return React.createElement('div', { className: "bg-white p-6 rounded-xl shadow-lg" },
+                    React.createElement('h2', { className: "text-2xl font-bold text-gray-800 mb-6 text-center" }, "Ticket Abastecimentos"),
+                    React.createElement('div', { className: "mb-8 p-4 border rounded-lg bg-gray-100 grid grid-cols-1 md:grid-cols-2 gap-4 items-end" },
+                        React.createElement('div', null,
+                            React.createElement('label', { htmlFor: 'file-input-ticket', className: "block text-sm font-medium text-gray-700 mb-1" }, "Importar Planilha de Transações"),
+                            React.createElement('input', { id: 'file-input-ticket', type: "file", onChange: handleFileChange, className: "w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100", accept: ".xlsx, .xls, .csv" })
+                        ),
+                        React.createElement('button', { onClick: handleImport, disabled: isImporting, className: "w-full p-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 transition" }, isImporting ? 'Importando...' : 'Importar Dados')
+                    ),
+                    React.createElement('div', { className: "mb-6 p-4 border rounded-lg bg-gray-50 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end" },
+                        React.createElement('div', { className: "lg:col-span-2" },
+                            React.createElement(DateRangePicker, {
+                                onDatesChange: (dates) => {
+                                    setFilters(prev => ({ ...prev, data_inicio: dates[0] || null, data_fim: dates[1] || null }));
+                                }
+                            })
+                        ),
+                        React.createElement('div', null, 
+                            React.createElement('label', { className: "block text-sm font-medium" }, "Placa"), 
+                            React.createElement('input', { type: "text", name: "placa", value: filters.placa, onChange: handleFilterChange, className: "mt-1 w-full p-2 border rounded" })
+                        ),
+                        React.createElement('div', null, 
+                            React.createElement('label', { className: "block text-sm font-medium" }, "Estabelecimento"), 
+                            React.createElement('input', { type: "text", name: "nome_estabelecimento", value: filters.nome_estabelecimento, onChange: handleFilterChange, className: "mt-1 w-full p-2 border rounded" })
+                        ),
+                        React.createElement('button', { onClick: handleSearch, disabled: isLoading, className: "w-full p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition lg:col-start-4" }, 'Buscar')
+                    ),
+                    React.createElement('div', { className: "rounded-lg border border-slate-200 shadow-sm overflow-hidden" },
+                        React.createElement('table', { className: "w-full text-sm text-left text-slate-600" },
+                            React.createElement('thead', { className: "text-xs text-slate-700 uppercase bg-slate-100" },
+                                React.createElement('tr', null,
+                                    ["Data", "Placa", "Estabelecimento", "Combustível", "Litros", "Vl/Litro", "Valor Total"].map(h => 
+                                        React.createElement('th', { key: h, className: "px-6 py-4 font-semibold border-b border-r border-slate-200 last:border-r-0" }, h)
+                                    )
+                                )
+                            ),
+                            React.createElement('tbody', null,
+                                isLoading ? React.createElement('tr', null, React.createElement('td', { colSpan: 7, className: "p-4 text-center" }, "Carregando...")) :
+                                !hasSearched ? React.createElement('tr', null, React.createElement('td', { colSpan: 7, className: "p-6 text-center text-slate-500" }, "Utilize os filtros acima para buscar os abastecimentos.")) :
+                                abastecimentos.length === 0 ? React.createElement('tr', null, React.createElement('td', { colSpan: 7, className: "p-6 text-center text-slate-500" }, "Nenhum resultado encontrado para sua busca.")) :
+                                abastecimentos.map(item => React.createElement('tr', { key: item.id, className: "hover:bg-blue-50 even:bg-slate-50" },
+                                    React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, formatDate(item.data_transacao)),
+                                    React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, React.createElement('span', { className: 'font-medium text-slate-800' }, item.placa)),
+                                    React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, item.nome_estabelecimento),
+                                    React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, item.tipo_combustivel),
+                                    React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, item.litros),
+                                    React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, `R$ ${(item.vl_litro || 0).toFixed(2).replace('.', ',')}`),
+                                    React.createElement('td', { className: "px-6 py-4" }, `R$ ${(item.valor_emissao || 0).toFixed(2).replace('.', ',')}`)
+                                ))
+                            )
+                        )
+                    )
+                );
+            }
+
+            function ShellAbastecimentos({ user, showToast }) {
+                const [abastecimentos, setAbastecimentos] = React.useState([]);
+                const [isLoading, setIsLoading] = React.useState(false);
+                const [file, setFile] = React.useState(null);
+                const [isImporting, setIsImporting] = React.useState(false);
+                const [filters, setFilters] = React.useState({ placa: '', data_inicio: null, data_fim: null, cnpj: '' });
+                const [hasSearched, setHasSearched] = React.useState(false);
+                const formatDate = (dateString) => {
+                    if (!dateString) return '—';
+                    return new Date(dateString).toLocaleString('pt-BR');
+                };
+                const handleFilterChange = (e) => {
+                    setFilters(prev => ({ ...prev, [e.target.name]: e.target.value }));
+                };
+                const handleSearch = async () => {
+                    setHasSearched(true);
+                    setIsLoading(true);
+                    try {
+                        let query = supabase.from('shell_abastecimentos').select('*');
+                        if (filters.placa) query = query.ilike('placa', `%${filters.placa.trim()}%`);
+                        if (filters.cnpj) query = query.ilike('cnpj', `%${filters.cnpj.trim()}%`);
+                        if (filters.data_inicio) {
+                            query = query.gte('data_hora_transacao', filters.data_inicio.toISOString());
+                        }
+                        if (filters.data_fim) {
+                            const endDate = new Date(filters.data_fim);
+                            endDate.setHours(23, 59, 59, 999);
+                            query = query.lte('data_hora_transacao', endDate.toISOString());
+                        }
+                        query = query.order('data_hora_transacao', { ascending: false });
+                        const { data, error } = await query;
+                        if (error) throw error;
+                        setAbastecimentos(data || []);
+                    } catch (err) {
+                        showToast("Erro ao buscar abastecimentos.", "error");
+                    }
+                    setIsLoading(false);
+                };
+                const handleFileChange = (e) => {
+                    if (e.target.files && e.target.files[0]) {
+                        setFile(e.target.files[0]);
+                    }
+                };
+                const handleImport = () => {
+                    if (!file) { return showToast("Por favor, selecione um arquivo.", "error"); }
+                    setIsImporting(true);
+                    const reader = new FileReader();
+                    reader.onload = async (e) => {
+                        try {
+                            const data = new Uint8Array(e.target.result);
+                            const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+                            const sheetName = workbook.SheetNames[0];
+                            const worksheet = workbook.Sheets[sheetName];
+                            const json = XLSX.utils.sheet_to_json(worksheet);
+                            const dataToInsert = json
+                                .filter(row => row['Status'] && row['Status'].toLowerCase() === 'sucesso')
+                                .map(row => {
+                                    const transacaoDate = row['Data/Hora transação'];
+                                    let finalDate = null;
+                                    if (transacaoDate) {
+                                        const d = new Date(transacaoDate);
+                                        if (!isNaN(d.getTime())) { finalDate = d.toISOString(); }
+                                    }
+                                    return {
+                                        cnpj: row['CNPJ do posto'],
+                                        status: row['Status'],
+                                        data_hora_transacao: finalDate,
+                                        cidade: row['Cidade do posto'],
+                                        estado: row['Estado do posto'],
+                                        placa: row['Placa'],
+                                        combustivel: row['Combustível'],
+                                        litros: parseFloat(row['Litros']) || 0,
+                                        total_abastecimento: parseFloat(row['Total do Abastecimento']) || 0,
+                                        rs_litro: parseFloat(row['R$/Litro']) || 0,
+                                        nome_condutor: row['Nome do condutor'],
+                                        nome_posto: row['Nome do posto'],
+                                        usuario_criacao: user.nome,
+                                        data_criacao: new Date().toISOString(),
+                                    };
+                                });
+                            if (dataToInsert.length === 0) {
+                                showToast("Nenhum registro com status 'Sucesso' encontrado na planilha.", "info");
+                                setIsImporting(false);
+                                return;
+                            }
+                            const { error } = await supabase.from('shell_abastecimentos').insert(dataToInsert, { returning: 'minimal' });
+                            if (error) { console.error("Erro do Supabase:", error); throw error; }
+
+                            for (const item of dataToInsert) {
+                                if(item.placa && item.data_hora_transacao) {
+                                    const periodo = new Date(item.data_hora_transacao).toLocaleDateString('pt-BR', { month: '2-digit', year: 'numeric' });
+                                    await verificarEGerarAlertaDeEncerramento(item.placa, periodo);
+                                }
+                            }
+
+                            showToast(`${dataToInsert.length} registros importados com sucesso!`, "success");
+                            setFile(null); 
+                            document.getElementById('file-input-shell').value = '';
+                            setHasSearched(false);
+                            setAbastecimentos([]);
+                        } catch (err) {
+                            showToast(`Erro ao processar o arquivo: ${err.message}`, "error");
+                        }
+                        setIsImporting(false);
+                    };
+                    reader.readAsArrayBuffer(file);
+                };
+                return React.createElement('div', { className: "bg-white p-6 rounded-xl shadow-lg" },
+                    React.createElement('h2', { className: "text-2xl font-bold text-gray-800 mb-6 text-center" }, "Importação Shell"),
+                    React.createElement('div', { className: "mb-8 p-4 border rounded-lg bg-gray-100 grid grid-cols-1 md:grid-cols-2 gap-4 items-end" },
+                        React.createElement('div', null,
+                            React.createElement('label', { htmlFor: 'file-input-shell', className: "block text-sm font-medium text-gray-700 mb-1" }, "Importar Planilha Shell"),
+                            React.createElement('input', { id: 'file-input-shell', type: "file", onChange: handleFileChange, className: "w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100", accept: ".xlsx, .xls, .csv" })
+                        ),
+                        React.createElement('button', { onClick: handleImport, disabled: isImporting, className: "w-full p-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 transition" }, isImporting ? 'Importando...' : 'Importar Dados')
+                    ),
+                    React.createElement('div', { className: "mb-6 p-4 border rounded-lg bg-gray-50 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end" },
+                        React.createElement('div', { className: "lg:col-span-2" },
+                            React.createElement(DateRangePicker, { onDatesChange: (dates) => { setFilters(prev => ({...prev, data_inicio: dates[0] || null, data_fim: dates[1] || null })); } })
+                        ),
+                        React.createElement('div', null, React.createElement('label', { className: "block text-sm font-medium" }, "Placa"), React.createElement('input', { type: "text", name: "placa", value: filters.placa, onChange: handleFilterChange, className: "mt-1 w-full p-2 border rounded" })),
+                        React.createElement('div', null, React.createElement('label', { className: "block text-sm font-medium" }, "CNPJ do Posto"), React.createElement('input', { type: "text", name: "cnpj", value: filters.cnpj, onChange: handleFilterChange, className: "mt-1 w-full p-2 border rounded" })),
+                        React.createElement('button', { onClick: handleSearch, disabled: isLoading, className: "w-full p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition lg:col-start-4" }, 'Buscar')
+                    ),
+                    React.createElement('div', { className: "rounded-lg border border-slate-200 shadow-sm overflow-hidden" },
+                        React.createElement('table', { className: "w-full text-sm text-left text-slate-600" },
+                            React.createElement('thead', { className: "text-xs text-slate-700 uppercase bg-slate-100" },
+                                React.createElement('tr', null,
+                                    ["Data", "Placa", "Posto", "Litros", "Valor Total"].map(h => React.createElement('th', { key: h, className: "px-6 py-4 font-semibold border-b border-r border-slate-200 last:border-r-0" }, h))
+                                )
+                            ),
+                            React.createElement('tbody', null,
+                                isLoading ? React.createElement('tr', null, React.createElement('td', { colSpan: 5, className: "p-4 text-center" }, "Carregando...")) :
+                                !hasSearched ? React.createElement('tr', null, React.createElement('td', { colSpan: 5, className: "p-6 text-center text-slate-500" }, "Utilize os filtros para buscar os abastecimentos.")) :
+                                abastecimentos.length === 0 ? React.createElement('tr', null, React.createElement('td', { colSpan: 5, className: "p-6 text-center text-slate-500" }, "Nenhum resultado encontrado.")) :
+                                abastecimentos.map(item => React.createElement('tr', { key: item.id, className: "hover:bg-blue-50 even:bg-slate-50" },
+                                    React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, formatDate(item.data_hora_transacao)),
+                                    React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, React.createElement('span', { className: 'font-medium text-slate-800' }, item.placa)),
+                                    React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, item.nome_posto),
+                                    React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, item.litros.toFixed(2)),
+                                    React.createElement('td', { className: "px-6 py-4" }, `R$ ${(item.total_abastecimento || 0).toFixed(2).replace('.', ',')}`)
+                                ))
+                            )
+                        )
+                    )
+                );
+            }
+
+            function Afericoes({ user, showToast }) {
+                const [afericoes, setAfericoes] = React.useState([]);
+                const [isLoading, setIsLoading] = React.useState(false);
+                const [showForm, setShowForm] = React.useState(false);
+                const [opcoesTanque, setOpcoesTanque] = React.useState([]);
+                const initialFormState = { tanque: '', data_afericao: '', volume_balde: '', volume_cta: '', volume_bomba: '', observacao: '' };
+                const [formData, setFormData] = React.useState(initialFormState);
+                const [filters, setFilters] = React.useState({ tanque: '', data_inicio: null, data_fim: null });
+                const [hasSearched, setHasSearched] = React.useState(false);
+
+                React.useEffect(() => {
+                    const fetchTanqueOptions = async () => {
+                        const { data, error } = await supabase.from('filiais').select('centro_de_custo_final');
+                        if (error) {
+                            showToast("Erro ao carregar opções de tanque.", "error");
+                        } else {
+                            const uniqueOptions = [...new Set(data.map(item => item.centro_de_custo_final).filter(Boolean))];
+                            setOpcoesTanque(uniqueOptions.sort());
+                        }
+                    };
+                    fetchTanqueOptions();
+                }, [showToast]);
+                const formatDate = (dateString) => {
+                    if (!dateString) return '—';
+                    const date = new Date(dateString.includes('T') ? dateString : dateString + 'T00:00:00');
+                    return date.toLocaleDateString('pt-BR');
+                };
+                const handleFilterChange = (e) => { setFilters(prev => ({ ...prev, [e.target.name]: e.target.value })); };
+                const handleInputChange = (e) => { setFormData(prev => ({ ...prev, [e.target.name]: e.target.value })); };
+                const handleSearch = async () => {
+                    setHasSearched(true);
+                    setIsLoading(true);
+                    try {
+                        let query = supabase.from('afericoes').select('*');
+                        if (filters.tanque) query = query.ilike('tanque', `%${filters.tanque.trim()}%`);
+                        if (filters.data_inicio) {
+                            query = query.gte('data_afericao', filters.data_inicio.toISOString());
+                        }
+                        if (filters.data_fim) {
+                            const endDate = new Date(filters.data_fim);
+                            endDate.setHours(23, 59, 59, 999);
+                            query = query.lte('data_afericao', endDate.toISOString());
+                        }
+                        query = query.order('data_afericao', { ascending: false });
+                        const { data, error } = await query;
+                        if (error) throw error;
+                        setAfericoes(data || []);
+                    } catch (err) {
+                        showToast("Erro ao buscar aferições.", "error");
+                    }
+                    setIsLoading(false);
+                };
+                const handleFormSubmit = async (e) => {
+                    e.preventDefault();
+                    setIsLoading(true);
+                    try {
+                        const recordToInsert = { ...formData, volume_balde: parseFloat(formData.volume_balde) || 0, volume_cta: parseFloat(formData.volume_cta) || 0, volume_bomba: parseFloat(formData.volume_bomba) || 0, usuario_criacao: user.nome, };
+                        const { error } = await supabase.from('afericoes').insert([recordToInsert]);
+                        if (error) throw error;
+                        showToast("Aferição registrada com sucesso!", "success");
+                        setFormData(initialFormState);
+                        setShowForm(false);
+                        setHasSearched(false);
+                        setAfericoes([]);
+                    } catch (err) {
+                        showToast(`Erro ao registrar: ${err.message}`, "error");
+                    }
+                    setIsLoading(false);
+                };
+                return React.createElement('div', { className: "bg-white p-6 rounded-xl shadow-lg" },
+                    React.createElement('h2', { className: "text-2xl font-bold text-gray-800 mb-6 text-center" }, "Aferições de Tanques"),
+                    !showForm && React.createElement('div', { className: 'flex justify-center mb-6' },
+                        React.createElement('button', { onClick: () => setShowForm(true), className: "p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center" }, React.createElement(LucideIcon, { name: 'PlusCircle', className: 'mr-2 h-5 w-5' }), "Nova Aferição")
+                    ),
+                    showForm && React.createElement('form', { onSubmit: handleFormSubmit, className: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8 p-4 border rounded-lg bg-gray-50" },
+                        React.createElement('select', { name: "tanque", value: formData.tanque, onChange: handleInputChange, className: "p-2 border rounded", required: true }, React.createElement('option', { value: '' }, 'Selecione o Tanque*'), opcoesTanque.map(t => React.createElement('option', { key: t, value: t }, t))),
+                        React.createElement('input', { name: "data_afericao", type: "date", value: formData.data_afericao, onChange: handleInputChange, className: "p-2 border rounded" }),
+                        React.createElement('input', { name: "volume_balde", type: "number", step: "0.01", value: formData.volume_balde, onChange: handleInputChange, placeholder: "Volume Balde (ml)", className: "p-2 border rounded" }),
+                        React.createElement('input', { name: "volume_cta", type: "number", step: "0.01", value: formData.volume_cta, onChange: handleInputChange, placeholder: "Volume CTA (L)", className: "p-2 border rounded" }),
+                        React.createElement('input', { name: "volume_bomba", type: "number", step: "0.01", value: formData.volume_bomba, onChange: handleInputChange, placeholder: "Volume Bomba (L)", className: "p-2 border rounded" }),
+                        React.createElement('input', { name: "observacao", value: formData.observacao, onChange: handleInputChange, placeholder: "Observação", className: "p-2 border rounded" }),
+                        React.createElement('div', { className: "md:col-span-full flex justify-end gap-4" }, React.createElement('button', { type: "button", onClick: () => setShowForm(false), className: "py-2 px-4 bg-gray-300 rounded-lg" }, "Cancelar"), React.createElement('button', { type: "submit", className: "py-2 px-4 bg-blue-600 text-white rounded-lg", disabled: isLoading }, isLoading ? 'Salvando...' : 'Salvar'))
+                    ),
+                    React.createElement('div', { className: "mb-6 p-4 border rounded-lg bg-gray-50 grid grid-cols-1 md:grid-cols-3 gap-4 items-end" },
+                        React.createElement('div', { className: "md:col-span-2" },
+                            React.createElement(DateRangePicker, {
+                                onDatesChange: (dates) => {
+                                    setFilters(prev => ({ ...prev, data_inicio: dates[0] || null, data_fim: dates[1] || null }));
+                                }
+                            })
+                        ),
+                        React.createElement('div', null, React.createElement('label', { className: "block text-sm font-medium" }, "Tanque"), React.createElement('input', { type: "text", name: "tanque", value: filters.tanque, onChange: handleFilterChange, className: "mt-1 w-full p-2 border rounded" })),
+                        React.createElement('button', { onClick: handleSearch, disabled: isLoading, className: "w-full p-2 bg-blue-600 text-white rounded-lg md:col-start-3" }, 'Buscar')
+                    ),
+                    React.createElement('div', { className: "rounded-lg border border-slate-200 shadow-sm overflow-hidden" },
+                        React.createElement('table', { className: "w-full text-sm text-left text-slate-600" },
+                            React.createElement('thead', { className: "text-xs text-slate-700 uppercase bg-slate-100" },
+                                React.createElement('tr', null,
+                                    ["Data Aferição", "Tanque", "Vol. Balde", "Vol. CTA", "Vol. Bomba", "Diferenças", "Observação"].map(h => React.createElement('th', { key: h, className: "px-6 py-4 font-semibold border-b border-r border-slate-200 last:border-r-0" }, h))
+                                )
+                            ),
+                            React.createElement('tbody', null,
+                                isLoading ? React.createElement('tr', null, React.createElement('td', { colSpan: 7, className: "p-4 text-center" }, "Carregando...")) :
+                                !hasSearched ? React.createElement('tr', null, React.createElement('td', { colSpan: 7, className: "p-6 text-center text-slate-500" }, "Utilize os filtros para buscar as aferições.")) :
+                                afericoes.length === 0 ? React.createElement('tr', null, React.createElement('td', { colSpan: 7, className: "p-6 text-center text-slate-500" }, "Nenhuma aferição encontrada.")) :
+                                afericoes.map(item => {
+                                    const diffCta = item.volume_balde - item.volume_cta;
+                                    const diffBomba = item.volume_balde - item.volume_bomba;
+                                    return React.createElement('tr', { key: item.id, className: "hover:bg-blue-50 even:bg-slate-50" },
+                                        React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, formatDate(item.data_afericao)),
+                                        React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, React.createElement('span', { className: 'font-medium text-slate-800' }, item.tanque)),
+                                        React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, item.volume_balde.toFixed(2)),
+                                        React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, item.volume_cta.toFixed(2)),
+                                        React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, item.volume_bomba.toFixed(2)),
+                                        React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" },
+                                            React.createElement('div', null,
+                                                React.createElement('p', { className: diffCta !== 0 ? 'text-red-600 font-semibold' : '' }, `CTA: ${diffCta.toFixed(2)} L`),
+                                                React.createElement('p', { className: diffBomba !== 0 ? 'text-red-600 font-semibold' : '' }, `Bomba: ${diffBomba.toFixed(2)} L`)
+                                            )
+                                        ),
+                                        React.createElement('td', { className: "px-6 py-4" }, item.observacao)
+                                    );
+                                })
+                            )
+                        )
+                    )
+                );
+            }
+
+            function CadastroFiliais({ user, showToast }) {
+                const [filiais, setFiliais] = React.useState([]);
+                const [isLoading, setIsLoading] = React.useState(true);
+                const [showForm, setShowForm] = React.useState(false);
+                const [isEditing, setIsEditing] = React.useState(false);
+                const [currentFilial, setCurrentFilial] = React.useState(null);
+                const initialFormState = { nome_filial: '', centro_de_custo_final: '', cta_cod_posto: '', ticket_info_adicional1: '', shell_cnpj: '' };
+                const [formData, setFormData] = React.useState(initialFormState);
+                const fetchFiliais = React.useCallback(async () => {
+                    setIsLoading(true);
+                    try {
+                        const { data, error } = await supabase.from('filiais').select('*').order('nome_filial');
+                        if (error) throw error;
+                        setFiliais(data || []);
+                    } catch (err) {
+                        showToast("Erro ao carregar filiais.", "error");
+                    }
+                    setIsLoading(false);
+                }, [showToast]);
+                React.useEffect(() => {
+                    fetchFiliais();
+                }, [fetchFiliais]);
+                const handleInputChange = (e) => {
+                    setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+                };
+                const handleFormSubmit = async (e) => {
+                    e.preventDefault();
+                    if (!formData.nome_filial.trim() || !formData.centro_de_custo_final.trim()) {
+                        showToast("Preencha os campos obrigatórios (Nome da Filial e Centro de Custo).", "error");
+                        return;
+                    }
+                    setIsLoading(true);
+                    try {
+                        const record = {
+                            nome_filial: formData.nome_filial.trim(),
+                            centro_de_custo_final: formData.centro_de_custo_final.trim(),
+                            cta_cod_posto: formData.cta_cod_posto.trim() || null,
+                            ticket_info_adicional1: formData.ticket_info_adicional1.trim() || null,
+                            shell_cnpj: formData.shell_cnpj.trim() || null,
+                        };
+                        if (isEditing) {
+                            const { error } = await supabase.from('filiais').update(record).eq('id', currentFilial.id);
+                            if (error) throw error;
+                            showToast("Mapeamento atualizado com sucesso!", "success");
+                        } else {
+                            const { error } = await supabase.from('filiais').insert([{ ...record, usuario_criacao: user.nome }]);
+                            if (error) throw error;
+                            showToast("Novo mapeamento criado com sucesso!", "success");
+                        }
+                        setShowForm(false);
+                        setIsEditing(false);
+                        setFormData(initialFormState);
+                        fetchFiliais();
+                    } catch (err) {
+                        showToast(`Erro ao salvar: ${err.message}`, "error");
+                    }
+                    setIsLoading(false);
+                };
+                const handleEditClick = (filial) => {
+                    setIsEditing(true);
+                    setCurrentFilial(filial);
+                    setFormData({
+                        nome_filial: filial.nome_filial || '',
+                        centro_de_custo_final: filial.centro_de_custo_final || '',
+                        cta_cod_posto: filial.cta_cod_posto || '',
+                        ticket_info_adicional1: filial.ticket_info_adicional1 || '',
+                        shell_cnpj: filial.shell_cnpj || ''
+                    });
+                    setShowForm(true);
+                };
+                return React.createElement('div', { className: "bg-white p-6 rounded-xl shadow-lg" },
+                    React.createElement('h2', { className: "text-2xl font-bold text-gray-800 mb-6 text-center" }, "Cadastro de Filiais (DE/PARA)"),
+                    !showForm && React.createElement('div', { className: 'flex justify-center mb-6' },
+                        React.createElement('button', {
+                            onClick: () => { setShowForm(true); setIsEditing(false); setFormData(initialFormState); },
+                            className: "p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center"
+                        }, React.createElement(LucideIcon, { name: 'PlusCircle', className: 'mr-2 h-5 w-5' }), "Novo Mapeamento")
+                    ),
+                    showForm && React.createElement('form', { onSubmit: handleFormSubmit, className: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8 p-4 border rounded-lg bg-gray-50" },
+                        React.createElement('input', { name: "nome_filial", value: formData.nome_filial, onChange: handleInputChange, placeholder: "Nome da Filial*", className: "p-2 border rounded" }),
+                        React.createElement('input', { name: "centro_de_custo_final", value: formData.centro_de_custo_final, onChange: handleInputChange, placeholder: "Centro de Custo Final*", className: "p-2 border rounded" }),
+                        React.createElement('input', { name: "cta_cod_posto", value: formData.cta_cod_posto, onChange: handleInputChange, placeholder: "Cód. Posto (CTA)", className: "p-2 border rounded" }),
+                        React.createElement('input', { name: "ticket_info_adicional1", value: formData.ticket_info_adicional1, onChange: handleInputChange, placeholder: "Info Adicional 1 (Ticket)", className: "p-2 border rounded" }),
+                        React.createElement('input', { name: "shell_cnpj", value: formData.shell_cnpj, onChange: handleInputChange, placeholder: "CNPJ (Shell)", className: "p-2 border rounded" }),
+                        React.createElement('div', { className: "md:col-span-full flex justify-end gap-4" },
+                            React.createElement('button', { type: "button", onClick: () => setShowForm(false), className: "py-2 px-4 bg-gray-300 rounded-lg" }, "Cancelar"),
+                            React.createElement('button', { type: "submit", className: "py-2 px-4 bg-blue-600 text-white rounded-lg", disabled: isLoading }, isLoading ? 'Salvando...' : 'Salvar')
+                        )
+                    ),
+                    React.createElement('div', { className: "rounded-lg border border-slate-200 shadow-sm overflow-hidden" },
+                        React.createElement('table', { className: "w-full text-sm text-left text-slate-600" },
+                            React.createElement('thead', { className: "text-xs text-slate-700 uppercase bg-slate-100" },
+                                React.createElement('tr', null,
+                                    ["Filial", "Centro de Custo", "Cód. Posto (CTA)", "Info (Ticket)", "CNPJ (Shell)", "Ações"].map(h => 
+                                        React.createElement('th', { key: h, className: "px-6 py-4 font-semibold border-b border-r border-slate-200 last:border-r-0" }, h)
+                                    )
+                                )
+                            ),
+                            React.createElement('tbody', null,
+                                isLoading ? React.createElement('tr', null, React.createElement('td', { colSpan: 6, className: "p-4 text-center" }, "Carregando...")) :
+                                filiais.map(item => React.createElement('tr', { key: item.id, className: "hover:bg-blue-50 even:bg-slate-50" },
+                                    React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, React.createElement('span', { className: 'font-medium text-slate-800' }, item.nome_filial)),
+                                    React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, item.centro_de_custo_final),
+                                    React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, item.cta_cod_posto),
+                                    React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, item.ticket_info_adicional1),
+                                    React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, item.shell_cnpj),
+                                    React.createElement('td', { className: "px-6 py-4 text-center" }, 
+                                        React.createElement('button', {onClick:()=>handleEditClick(item), className:"text-gray-400 hover:text-blue-600 transition-colors"}, 
+                                            React.createElement(LucideIcon, {name:'Edit', className: 'h-5 w-5'})
+                                        )
+                                    )
+                                ))
+                            )
+                        )
+                    )
+                );
+            }
+
+            function UserManagement({ user, showToast }) {
+                const [usersList, setUsersList] = React.useState([]);
+                const [isLoading, setIsLoading] = React.useState(false);
+                const [showForm, setShowForm] = React.useState(false);
+                const initialFormState = { nome: '', usuario: '', senha: '', nivel_permissao: 'user' };
+                const [formData, setFormData] = React.useState(initialFormState);
+                const [showConfirmModal, setShowConfirmModal] = React.useState(false);
+                const [userToDelete, setUserToDelete] = React.useState(null);
+                const permissionLevels = ['administrador', 'user'];
+                const getRoleBadge = (role) => {
+                    const baseClasses = "inline-flex items-center py-1 px-3 rounded-full text-xs font-medium capitalize";
+                    switch (role) {
+                        case 'administrador': return React.createElement('span', { className: `bg-red-100 text-red-800 ${baseClasses}` }, role);
+                        case 'user': default: return React.createElement('span', { className: `bg-gray-100 text-gray-800 ${baseClasses}` }, role);
+                    }
+                };
+                const fetchUsers = React.useCallback(async () => {
+                    setIsLoading(true);
+                    try {
+                        const { data, error } = await supabase.from('usuarios').select('*').order('data_criacao', { ascending: false });
+                        if (error) throw error;
+                        setUsersList(data || []);
+                    } catch (e) {
+                        showToast("Erro ao carregar usuários.", "error");
+                    }
+                    setIsLoading(false);
+                }, [showToast]);
+                React.useEffect(() => {
+                    fetchUsers();
+                }, [fetchUsers]);
+                const handleInputChange = (e) => {
+                    setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+                };
+                const handleAddUser = async (e) => {
+                    e.preventDefault();
+                    if (!formData.nome.trim() || !formData.usuario.trim() || !formData.senha.trim()) { 
+                        showToast("Preencha todos os campos obrigatórios.", "error");
+                        return; 
+                    }
+                    setIsLoading(true);
+                    try {
+                        const { data: existing } = await supabase.from('usuarios').select('usuario').eq('usuario', formData.usuario.trim().toLowerCase());
+                        if (existing && existing.length > 0) { 
+                            showToast("Nome de usuário já existe.", "error");
+                            setIsLoading(false); 
+                            return; 
+                        }
+                        const { error } = await supabase.from('usuarios').insert([{ 
+                            nome: formData.nome.trim(), 
+                            usuario: formData.usuario.trim().toLowerCase(), 
+                            senha: formData.senha,
+                            nivel_permissao: formData.nivel_permissao,
+                            usuario_criacao: user.nome
+                        }]);
+                        if (error) throw error;
+                        showToast("Usuário adicionado com sucesso!", "success");
+                        setFormData(initialFormState);
+                        setShowForm(false);
+                        fetchUsers();
+                    } catch(e) {
+                        showToast("Erro ao adicionar usuário.", "error");
+                    }
+                    setIsLoading(false);
+                };
+                const confirmDeleteUser = (user) => { 
+                    setUserToDelete(user); 
+                    setShowConfirmModal(true); 
+                };
+                const handleDeleteUser = async () => {
+                    if (!userToDelete) return;
+                    setIsLoading(true);
+                    try {
+                        const { error } = await supabase.from('usuarios').delete().eq('id', userToDelete.id);
+                        if (error) throw error;
+                        showToast("Usuário excluído com sucesso!", "success");
+                        fetchUsers();
+                    } catch(e) {
+                        showToast("Erro ao excluir usuário.", "error");
+                    }
+                    setIsLoading(false);
+                    setShowConfirmModal(false);
+                    setUserToDelete(null);
+                };
+                return React.createElement('div', { className: "bg-white p-6 rounded-xl shadow-lg" },
+                    React.createElement('h2', { className: "text-2xl font-bold text-gray-800 mb-6 text-center" }, "Gerenciamento de Usuários"),
+                    !showForm && React.createElement('div', { className: 'flex justify-center mb-6' },
+                        React.createElement('button', {
+                            onClick: () => setShowForm(true),
+                            className: "p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center"
+                        }, React.createElement(LucideIcon, { name: 'PlusCircle', className: 'mr-2 h-5 w-5' }), "Novo Usuário")
+                    ),
+                    showForm && React.createElement('form', { onSubmit: handleAddUser, className: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8 p-4 border rounded-lg bg-gray-50" },
+                        React.createElement('input', { name: "nome", value: formData.nome, onChange: handleInputChange, placeholder: "Nome Completo*", className: "p-2 border rounded" }),
+                        React.createElement('input', { name: "usuario", value: formData.usuario, onChange: handleInputChange, placeholder: "Usuário (para login)*", className: "p-2 border rounded" }),
+                        React.createElement('input', { name: "senha", type: "password", value: formData.senha, onChange: handleInputChange, placeholder: "Senha*", className: "p-2 border rounded" }),
+                        React.createElement('select', { name: "nivel_permissao", value: formData.nivel_permissao, onChange: handleInputChange, className: "p-2 border rounded" }, 
+                            permissionLevels.map(r => React.createElement('option', { key: r, value: r }, r.charAt(0).toUpperCase() + r.slice(1)))
+                        ),
+                        React.createElement('div', { className: "lg:col-span-4 flex justify-end gap-4" },
+                            React.createElement('button', { type: "button", onClick: () => setShowForm(false), className: "py-2 px-4 bg-gray-300 rounded-lg" }, "Cancelar"),
+                            React.createElement('button', { type: "submit", className: "py-2 px-4 bg-blue-600 text-white rounded-lg", disabled: isLoading }, isLoading ? 'Salvando...' : 'Salvar')
+                        )
+                    ),
+                    React.createElement('div', { className: "rounded-lg border border-slate-200 shadow-sm overflow-hidden" },
+                        React.createElement('table', { className: "w-full text-sm text-left text-slate-600" },
+                            React.createElement('thead', { className: "text-xs text-slate-700 uppercase bg-slate-100" }, 
+                                React.createElement('tr', null, 
+                                    ["Usuário", "Nome Completo", "Nível de Permissão", "Data Criação", "Ações"].map(h => React.createElement('th',{key:h, className:"px-6 py-4 font-semibold border-b border-r border-slate-200 last:border-r-0"},h))
+                                )
+                            ),
+                            React.createElement('tbody', null, 
+                                isLoading ? React.createElement('tr', null, React.createElement('td', { colSpan: 5, className: "p-4 text-center" }, "Carregando...")) :
+                                usersList.map(u => React.createElement('tr', { key: u.id, className: "hover:bg-blue-50 even:bg-slate-50" },
+                                    React.createElement('td', {className:"px-6 py-4 border-r border-slate-200"}, React.createElement('span', { className: 'font-medium text-slate-800' }, u.usuario)),
+                                    React.createElement('td', {className:"px-6 py-4 border-r border-slate-200"}, u.nome),
+                                    React.createElement('td', {className:"px-6 py-4 border-r border-slate-200"}, getRoleBadge(u.nivel_permissao)),
+                                    React.createElement('td', {className:"px-6 py-4 border-r border-slate-200"}, new Date(u.data_criacao).toLocaleDateString('pt-BR')),
+                                    React.createElement('td', {className:"px-6 py-4 text-center"}, 
+                                        React.createElement('button', { onClick: () => confirmDeleteUser(u), className: "text-gray-400 hover:text-red-600 transition-colors" }, 
+                                            React.createElement(LucideIcon, {name: 'Trash2', className: 'h-5 w-5'})
+                                        )
+                                    )
+                                ))
+                            )
+                        )
+                    ),
+                    showConfirmModal && React.createElement(ConfirmationModal, { message: `Deseja realmente excluir o usuário "${userToDelete?.usuario}"?`, onConfirm: handleDeleteUser, onCancel: () => setShowConfirmModal(false) })
+                );
+            }
 
             // ================================================================
             // 4. COMPONENTE PRINCIPAL (App)
@@ -346,7 +1539,6 @@
                 };
                 const showToast = (message, type = 'success') => setToast({ show: true, message, type });
                 const closeToast = () => setToast({ show: false, message: '', type: '' });
-                
                 const toggleMenu = (menu) => {
                     if (isSidebarCollapsed) {
                         setIsSidebarCollapsed(false);
@@ -354,14 +1546,12 @@
                         setOpenMenu(openMenu === menu ? '' : menu);
                     }
                 };
-
                 const toggleSidebarCollapse = () => {
                     setIsSidebarCollapsed(!isSidebarCollapsed);
                     if (!isSidebarCollapsed) {
                         setOpenMenu('');
                     }
                 };
-                
                 const renderPage = () => {
                     switch (currentPage) {
                         case 'dashboard': return React.createElement(Dashboard, { user, showToast });
@@ -377,18 +1567,17 @@
                         default: return React.createElement(Dashboard, { user, showToast });
                     }
                 };
-                
                 if (!user) {
                     return React.createElement(LoginPage, { onLogin: handleLogin });
                 }
 
                 const MenuItem = ({ page, icon, text }) => {
-                   const isActive = currentPage === page;
-                   return React.createElement('li', null,
-                       React.createElement('button', {
+                    const isActive = currentPage === page;
+                    return React.createElement('li', null,
+                        React.createElement('button', {
                            onClick: () => { setCurrentPage(page); setIsSidebarOpen(false); },
                            className: `flex items-center w-full px-4 py-2 rounded-lg transition-colors ${isSidebarCollapsed ? 'justify-center' : ''} ${isActive ? 'bg-blue-600 text-white' : 'hover:bg-gray-700 text-gray-300'}`
-                       },
+                        },
                            React.createElement(LucideIcon, { name: icon, className: `h-5 w-5 flex-shrink-0 ${!isSidebarCollapsed && 'mr-3'}` }),
                            !isSidebarCollapsed && React.createElement('span', {className: 'truncate'}, text)
                        )
@@ -425,23 +1614,19 @@
                                     onClick: () => setCurrentPage('dashboard') 
                                 })
                             ),
-                            
                             React.createElement('nav', { className: "flex-grow" },
                                 React.createElement('ul', { className: "space-y-2" },
                                     React.createElement(MenuItem, { page: 'dashboard', icon: 'LayoutDashboard', text: 'Dashboard' }),
-                                    
                                     React.createElement(MenuCategory, { title: "Importação", icon: "PlusCircle", menuKey: "importacao" },
                                         React.createElement(MenuItem, { page: 'ticketAbastecimentos', icon: 'Ticket', text: 'Ticket Abastecimentos' }),
                                         React.createElement(MenuItem, { page: 'ctaAbastecimentos', icon: 'Fuel', text: 'CTA Abastecimentos' }),
                                         React.createElement(MenuItem, { page: 'ctaCarregamentos', icon: 'Ship', text: 'CTA Carregamentos' }),
                                         React.createElement(MenuItem, { page: 'shellAbastecimentos', icon: 'Fuel', text: 'Shell Abastecimentos' })
                                     ),
-                                    
                                     React.createElement(MenuCategory, { title: "Operacional", icon: "Settings", menuKey: "operacional" },
                                         React.createElement(MenuItem, { page: 'alertas', icon: 'FileText', text: 'Alertas' }),
                                         React.createElement(MenuItem, { page: 'afericoes', icon: 'Tank', text: 'Aferições' }),
                                     ),
-                                    
                                     user.nivel_permissao === 'administrador' && React.createElement(MenuCategory, { title: "Cadastros", icon: "FileText", menuKey: "cadastros" },
                                         React.createElement(MenuItem, { page: 'cadastroFiliais', icon: 'Building', text: 'Filiais (DE/PARA)' }),
                                         React.createElement(MenuItem, { page: 'mapeamentoCombustivel', icon: 'Fuel', text: 'DE/PARA Combustível' }),
@@ -449,24 +1634,22 @@
                                     )
                                 )
                             ),
-
                             React.createElement('div', {className: 'mt-auto pt-4 border-t border-gray-700'},
                                 React.createElement('button', { 
-                                    onClick: toggleSidebarCollapse,
+                                    onClick: toggleSidebarCollapse, 
                                     className: "w-full flex items-center p-3 rounded-lg text-gray-400 hover:bg-gray-700 justify-center mb-2" 
                                 },
                                     React.createElement(LucideIcon, { name: isSidebarCollapsed ? "ChevronsRight" : "ChevronsLeft", className: "w-6 h-6" })
                                 ),
                                 React.createElement('button', { 
                                     onClick: handleLogout, 
-                                    className: `w-full flex items-center p-3 rounded-lg text-red-400 hover:bg-gray-700 ${isSidebarCollapsed ? 'justify-center' : ''}`
+                                    className: `w-full flex items-center p-3 rounded-lg text-red-400 hover:bg-gray-700 ${isSidebarCollapsed ? 'justify-center' : ''}` 
                                 },
                                     React.createElement(LucideIcon, { name: "LogOut", className: `w-6 h-6 ${!isSidebarCollapsed && 'mr-3'}` }),
                                     !isSidebarCollapsed && 'Sair'
                                 )
                             )
                         ),
-                        
                         React.createElement('main', { className: "flex-1 p-4 md:p-8 flex flex-col" },
                             React.createElement('header', { className: "w-full bg-white p-4 rounded-xl shadow-lg mb-8 flex justify-between items-center" },
                                 React.createElement('button', { className: "md:hidden text-gray-700 p-2", onClick: () => setIsSidebarOpen(true) }, React.createElement(LucideIcon, { name: "Menu" })),
@@ -488,6 +1671,7 @@
             const initializeSupabaseAndRenderApp = () => {
                 try {
                     supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                    supabaseProjeto2 = window.supabase.createClient(SUPABASE_URL_PROJETO_2, SUPABASE_ANON_KEY_PROJETO_2);
                     ReactDOM.render(React.createElement(App), document.getElementById('root'));
                 } catch (e) {
                     console.error("Erro ao inicializar o cliente Supabase:", e);
