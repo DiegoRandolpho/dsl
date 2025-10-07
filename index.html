@@ -68,111 +68,113 @@
             const SUPABASE_URL_PROJETO_2 = 'https://gfivmnnysomfwrffybeh.supabase.co';
             const SUPABASE_ANON_KEY_PROJETO_2 = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdmaXZtbm55c29tZndyZmZ5YmVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMyOTY3NjgsImV4cCI6MjA2ODg3Mjc2OH0.NxetXJoCLh4q9zAqn_olimziI3YP4MAJzB8ed4qf8cg';
             let supabaseProjeto2;
-
+            
             // ================================================================
             // 2. COMPONENTES AUXILIARES (Helpers)
             // ================================================================
-            async function verificarEGerarAlertaDeEncerramento(placa, periodo) {
-                if (!supabaseProjeto2 || !placa) return;
 
-                try {
-                    const tipoAlerta = 'Placa não encontrada na base de equipamentos';
+            async function gerarAlertasEmLote(dadosImportados, plataformaAtual) {
+                if (!dadosImportados || dadosImportados.length === 0) return;
 
-                    // Verifica se já existe um alerta para essa placa e tipo, para não duplicar
-                    const { data: alertaExistente, error: checkError } = await supabase
-                        .from('alertas')
-                        .select('id')
-                        .eq('placa', placa)
-                        .eq('tipo_alerta', tipoAlerta)
-                        .maybeSingle();
+                console.log("Iniciando geração de alertas em lote...");
+                const novosAlertas = [];
+                
+                // Mapeia os dados para um formato comum
+                const dadosMapeados = dadosImportados.map(item => ({
+                    placa: item.placa,
+                    data: new Date(plataformaAtual === 'ticket' ? item.data_transacao : item.data_hora_transacao)
+                }));
 
-                    if (checkError) throw checkError;
-                    if (alertaExistente) return; // Alerta já existe, não faz nada
+                const placasUnicas = [...new Set(dadosMapeados.map(d => d.placa).filter(Boolean))];
+                if (placasUnicas.length === 0) return;
 
-                    // Consulta a base externa para ver se a placa existe
-                    const { data, error } = await supabaseProjeto2
-                        .from('equipamentos')
-                        .select('plate') // Apenas seleciona a própria placa para confirmar a existência
-                        .eq('plate', placa)
-                        .maybeSingle(); 
+                // --- Verificação 1: Placas não encontradas na base externa ---
+                const tipoAlertaPlacaNaoEncontrada = 'Placa não encontrada na base de equipamentos';
+                
+                // Busca placas que JÁ existem na base externa
+                const { data: placasExternasExistentes, error: placasExternasError } = await supabaseProjeto2
+                    .from('equipamentos')
+                    .select('plate')
+                    .in('plate', placasUnicas);
+                
+                if (placasExternasError) throw placasExternasError;
 
-                    if (error) throw new Error(`Erro ao consultar a placa no segundo projeto: ${error.message}`);
-                    
-                    // Se a placa NÃO for encontrada (!data), cria o alerta
-                    if (!data) {
-                        await supabase
-                            .from('alertas')
-                            .insert([{ 
-                                placa: placa,
-                                periodo: periodo,
-                                tipo_alerta: tipoAlerta,
-                                status: 'pendente'
-                            }]);
+                const setPlacasExternas = new Set(placasExternasExistentes.map(p => p.plate));
+                const placasNaoEncontradas = placasUnicas.filter(p => !setPlacasExternas.has(p));
+                
+                // --- Verificação 2: Abastecimento em 2 plataformas ---
+                const tipoAlertaDuplicidade = 'Abastecimento em 2 plataformas';
+                const periodosUnicos = [...new Set(dadosMapeados.map(d => d.data.toLocaleDateString('pt-BR', { month: '2-digit', year: 'numeric' })))];
+                
+                // Pega todos os abastecimentos da outra plataforma para as placas e períodos relevantes
+                const tabelaOutraPlataforma = plataformaAtual === 'ticket' ? 'shell_abastecimentos' : 'ticket_abastecimentos';
+                const colunaDataOutraPlataforma = plataformaAtual === 'ticket' ? 'data_hora_transacao' : 'data_transacao';
+                
+                const primeiroDiaMes = new Date(dadosMapeados[0].data.getFullYear(), dadosMapeados[0].data.getMonth(), 1);
+                const ultimoDiaMes = new Date(dadosMapeados[0].data.getFullYear(), dadosMapeados[0].data.getMonth() + 1, 0, 23, 59, 59);
+
+                const { data: abastecimentosOutraPlataforma, error: outraPlataformaError } = await supabase
+                    .from(tabelaOutraPlataforma)
+                    .select('placa')
+                    .in('placa', placasUnicas)
+                    .gte(colunaDataOutraPlataforma, primeiroDiaMes.toISOString())
+                    .lte(colunaDataOutraPlataforma, ultimoDiaMes.toISOString());
+
+                if(outraPlataformaError) throw outraPlataformaError;
+
+                const setPlacasOutraPlataforma = new Set(abastecimentosOutraPlataforma.map(a => a.placa));
+
+                // --- Consolidação e Prevenção de Duplicatas ---
+                // Busca todos os alertas já existentes para as placas e tipos que vamos verificar
+                const { data: alertasJaExistentes, error: alertasExistentesError } = await supabase
+                    .from('alertas')
+                    .select('placa, periodo, tipo_alerta')
+                    .in('placa', placasUnicas)
+                    .in('periodo', periodosUnicos)
+                    .in('tipo_alerta', [tipoAlertaPlacaNaoEncontrada, tipoAlertaDuplicidade]);
+                
+                if (alertasExistentesError) throw alertasExistentesError;
+                const setAlertasExistentes = new Set(alertasJaExistentes.map(a => `${a.placa}-${a.periodo}-${a.tipo_alerta}`));
+
+                // Agora, cria os novos alertas
+                for (const item of dadosMapeados) {
+                    const periodo = item.data.toLocaleDateString('pt-BR', { month: '2-digit', year: 'numeric' });
+
+                    // Checa se deve criar alerta de placa não encontrada
+                    if (placasNaoEncontradas.includes(item.placa)) {
+                        const chave = `${item.placa}-${periodo}-${tipoAlertaPlacaNaoEncontrada}`;
+                        if (!setAlertasExistentes.has(chave)) {
+                            novosAlertas.push({ placa: item.placa, periodo, tipo_alerta: tipoAlertaPlacaNaoEncontrada, status: 'pendente' });
+                            setAlertasExistentes.add(chave); // Evita adicionar de novo no mesmo lote
+                        }
                     }
-                } catch (err) {
-                    console.error('Erro na verificação de existência de placa:', err);
+                    
+                    // Checa se deve criar alerta de duplicidade de plataforma
+                    if (setPlacasOutraPlataforma.has(item.placa)) {
+                         const chave = `${item.placa}-${periodo}-${tipoAlertaDuplicidade}`;
+                         if (!setAlertasExistentes.has(chave)) {
+                            novosAlertas.push({ placa: item.placa, periodo, tipo_alerta: tipoAlertaDuplicidade, status: 'pendente' });
+                            setAlertasExistentes.add(chave); // Evita adicionar de novo no mesmo lote
+                         }
+                    }
                 }
+
+                // Insere todos os novos alertas de uma vez
+                if (novosAlertas.length > 0) {
+                    console.log(`Inserindo ${novosAlertas.length} novos alertas...`);
+                    const { error: insertError } = await supabase.from('alertas').insert(novosAlertas);
+                    if (insertError) throw insertError;
+                }
+                console.log("Geração de alertas em lote concluída.");
             }
+
             function LucideIcon({ name, className }) {
                 return React.createElement('span', {
                     className: className,
                     dangerouslySetInnerHTML: { __html: icons[name] || '' }
                 });
             }
-async function verificarDuplicidadePlataforma(placa, dataTransacao, plataformaAtual) {
-                if (!placa || !dataTransacao) return;
 
-                try {
-                    const dataObj = new Date(dataTransacao);
-                    const periodo = dataObj.toLocaleDateString('pt-BR', { month: '2-digit', year: 'numeric' });
-                    const tipoAlerta = "Abastecimento em 2 plataformas";
-
-                    // 1. Evitar alertas duplicados
-                    const { data: alertaExistente, error: checkError } = await supabase
-                        .from('alertas')
-                        .select('id')
-                        .eq('placa', placa)
-                        .eq('periodo', periodo)
-                        .eq('tipo_alerta', tipoAlerta)
-                        .maybeSingle();
-                    
-                    if (checkError) throw checkError;
-                    if (alertaExistente) return;
-
-                    // 2. Definir qual tabela consultar
-                    const tabelaParaVerificar = plataformaAtual === 'ticket' ? 'shell_abastecimentos' : 'ticket_abastecimentos';
-                    const colunaDataParaVerificar = plataformaAtual === 'ticket' ? 'data_hora_transacao' : 'data_transacao';
-
-                    // 3. Definir o intervalo do mês
-                    const primeiroDia = new Date(dataObj.getFullYear(), dataObj.getMonth(), 1);
-                    const ultimoDia = new Date(dataObj.getFullYear(), dataObj.getMonth() + 1, 0, 23, 59, 59);
-
-                    // 4. Consultar a outra tabela
-                    const { data, error } = await supabase
-                        .from(tabelaParaVerificar)
-                        .select('id')
-                        .eq('placa', placa)
-                        .gte(colunaDataParaVerificar, primeiroDia.toISOString())
-                        .lte(colunaDataParaVerificar, ultimoDia.toISOString())
-                        .maybeSingle();
-
-                    if (error) throw error;
-
-                    // 5. Se encontrou um registro na outra tabela, cria o alerta
-                    if (data) {
-                        await supabase
-                            .from('alertas')
-                            .insert([{ 
-                                placa: placa,
-                                periodo: periodo,
-                                tipo_alerta: tipoAlerta,
-                                status: 'pendente'
-                            }]);
-                    }
-                } catch (err) {
-                    console.error('Erro ao verificar duplicidade de plataforma:', err);
-                }
-            }
             function Toast({ message, type, onClose }) {
                 const bgColor = type === 'success' ? 'bg-green-500' : 'bg-red-500';
                 React.useEffect(() => {
@@ -343,7 +345,6 @@ async function verificarDuplicidadePlataforma(placa, dataTransacao, plataformaAt
 
                 const alertasPendentes = alertas.filter(a => a.status === 'pendente');
                 const alertasConcluidos = alertas.filter(a => a.status === 'concluido');
-
                 const AlertCard = ({ alerta }) => (
                     React.createElement('div', { className: "bg-white p-4 rounded-lg shadow-md border-l-4 border-yellow-500" },
                         React.createElement('p', { className: "text-sm text-gray-500" }, `Período: ${alerta.periodo || 'N/A'}`),
@@ -981,18 +982,20 @@ async function verificarDuplicidadePlataforma(placa, dataTransacao, plataformaAt
                                 setIsImporting(false);
                                 return;
                             }
+                            
+                            // 1. Insere os dados principais
                             const { error } = await supabase.from('ticket_abastecimentos').insert(dataToInsert, { returning: 'minimal' });
                             if (error) { console.error("Erro do Supabase:", error); throw error; }
 
-                            for (const item of dataToInsert) {
-                                if(item.placa && item.data_transacao) {
-                                    const periodo = new Date(item.data_transacao).toLocaleDateString('pt-BR', { month: '2-digit', year: 'numeric' });
-                                    await verificarEGerarAlertaDeEncerramento(item.placa, periodo);
-                                    await verificarDuplicidadePlataforma(item.placa, item.data_transacao, 'ticket');
-                                }
-                            }
+                            showToast(`${dataToInsert.length} registros importados com sucesso! Gerando alertas...`, "success");
+                            
+                            // 2. Chama a geração de alertas em lote (processo rápido em segundo plano)
+                            gerarAlertasEmLote(dataToInsert, 'ticket').catch(err => {
+                                console.error("Erro ao gerar alertas em lote para Ticket:", err);
+                                showToast("Erro ao gerar alertas.", "error");
+                            });
 
-                            showToast(`${dataToInsert.length} registros importados com sucesso!`, "success");
+                            // Limpa a interface imediatamente
                             setFile(null); 
                             document.getElementById('file-input-ticket').value = '';
                             setHasSearched(false);
@@ -1058,6 +1061,7 @@ async function verificarDuplicidadePlataforma(placa, dataTransacao, plataformaAt
                     )
                 );
             }
+
             function ShellAbastecimentos({ user, showToast }) {
                 const [abastecimentos, setAbastecimentos] = React.useState([]);
                 const [isLoading, setIsLoading] = React.useState(false);
@@ -1143,18 +1147,20 @@ async function verificarDuplicidadePlataforma(placa, dataTransacao, plataformaAt
                                 setIsImporting(false);
                                 return;
                             }
+                            
+                            // 1. Insere os dados principais
                             const { error } = await supabase.from('shell_abastecimentos').insert(dataToInsert, { returning: 'minimal' });
                             if (error) { console.error("Erro do Supabase:", error); throw error; }
+                            
+                            showToast(`${dataToInsert.length} registros importados com sucesso! Gerando alertas...`, "success");
 
-                            for (const item of dataToInsert) {
-                                if(item.placa && item.data_hora_transacao) {
-                                    const periodo = new Date(item.data_hora_transacao).toLocaleDateString('pt-BR', { month: '2-digit', year: 'numeric' });
-                                    await verificarEGerarAlertaDeEncerramento(item.placa, periodo);
-                                    await verificarDuplicidadePlataforma(item.placa, item.data_hora_transacao, 'shell');
-                                }
-                            }
+                            // 2. Chama a geração de alertas em lote (processo rápido em segundo plano)
+                             gerarAlertasEmLote(dataToInsert, 'shell').catch(err => {
+                                console.error("Erro ao gerar alertas em lote para Shell:", err);
+                                showToast("Erro ao gerar alertas.", "error");
+                            });
 
-                            showToast(`${dataToInsert.length} registros importados com sucesso!`, "success");
+                            // Limpa a interface imediatamente
                             setFile(null); 
                             document.getElementById('file-input-shell').value = '';
                             setHasSearched(false);
@@ -1597,7 +1603,6 @@ async function verificarDuplicidadePlataforma(placa, dataTransacao, plataformaAt
                 const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
                 const [openMenu, setOpenMenu] = React.useState('');
                 const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(false);
-                
                 // URLs dos ícones personalizados
                 const ctaIconUrl = 'https://ikypygpbdmoxozfmwewr.supabase.co/storage/v1/object/sign/ICONS/CTAICON.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9lMGJiMDk5Zi1jZmE5LTQ5Y2UtYjUwNy0wZmE2ZWZkYWYxOTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJJQ09OUy9DVEFJQ09OLnBuZyIsImlhdCI6MTc1OTg2NTA1OSwiZXhwIjoyMDc1MjI1MDU5fQ.xnv-1nyrxg9XsQxLr7uoUQs2rpgzBeSfWXoX8Y37Y-U';
                 const ticketIconUrl = 'https://ikypygpbdmoxozfmwewr.supabase.co/storage/v1/object/sign/ICONS/TICKET.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9lMGJiMDk5Zi1jZmE5LTQ5Y2UtYjUwNy0wZmE2ZWZkYWYxOTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJJQ09OUy9USUNLRVQucG5nIiwiaWF0IjoxNzU5ODY1MTkzLCJleHAiOjIwNzUyMjUxOTN9.EUaHSgL2RjDC8Dt2XWtibSNhh6NtPy8G-3kFQHDpvQY';
@@ -1792,3 +1797,5 @@ async function verificarDuplicidadePlataforma(placa, dataTransacao, plataformaAt
     </script>
 </body>
 </html>
+}
+No CTA Carregamento preciso que adicione a coluna KM e que também seja importada da planilha. O nome da coluna na planilha é "KM"
