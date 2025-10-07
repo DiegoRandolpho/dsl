@@ -442,8 +442,6 @@ function MapeamentoCombustivel({ user, showToast }) {
 /* FIM DO NOVO COMPONENTE */
 /* INÍCIO DO CÓDIGO COMPLETO PARA CtaCarregamentos */
 
-/* INÍCIO DO CÓDIGO COMPLETO PARA CtaCarregamentos */
-
 function CtaCarregamentos({ user, showToast }) {
     const [carregamentos, setCarregamentos] = React.useState([]);
     const [isLoading, setIsLoading] = React.useState(false);
@@ -642,7 +640,6 @@ function CtaCarregamentos({ user, showToast }) {
 }
 
 /* FIM DO CÓDIGO COMPLETO */
-/* INÍCIO DO CÓDIGO COMPLETO E CORRIGIDO PARA CtaAbastecimentos */
 
 /* INÍCIO DO CÓDIGO COMPLETO E CORRIGIDO PARA CtaAbastecimentos */
 
@@ -1384,11 +1381,6 @@ function ShellAbastecimentos({ user, showToast }) {
 
 /* FIM DO NOVO COMPONENTE */
 /* FIM DO CÓDIGO COMPLETO E CORRIGIDO */
-            // --- ESQUELETO: Aferições ---
-            /* INÍCIO DO CÓDIGO ATUALIZADO PARA Afericoes */
-
-/* INÍCIO DO CÓDIGO COMPLETO PARA Afericoes */
-
 /* INÍCIO DO CÓDIGO COMPLETO PARA Afericoes */
 
 function Afericoes({ user, showToast }) {
@@ -1492,7 +1484,11 @@ function Afericoes({ user, showToast }) {
         ),
         React.createElement('div', { className: "rounded-lg border border-slate-200 shadow-sm overflow-hidden" },
             React.createElement('table', { className: "w-full text-sm text-left text-slate-600" },
-                React.createElement('thead', { /* ... */ }),
+                React.createElement('thead', { className: "text-xs text-slate-700 uppercase bg-slate-100" },
+                    React.createElement('tr', null,
+                        ["Data Aferição", "Tanque", "Vol. Balde", "Vol. CTA", "Vol. Bomba", "Diferenças", "Observação"].map(h => React.createElement('th', { key: h, className: "px-6 py-4 font-semibold border-b border-r border-slate-200 last:border-r-0" }, h))
+                    )
+                ),
                 React.createElement('tbody', null,
                     isLoading ? React.createElement('tr', null, React.createElement('td', { colSpan: 7, className: "p-4 text-center" }, "Carregando...")) :
                     !hasSearched ? React.createElement('tr', null, React.createElement('td', { colSpan: 7, className: "p-6 text-center text-slate-500" }, "Utilize os filtros para buscar as aferições.")) :
