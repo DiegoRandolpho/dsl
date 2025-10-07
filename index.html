@@ -944,9 +944,6 @@
                                 if (transacaoDate) {
                                     const d = new Date(transacaoDate);
                                     if (!isNaN(d.getTime())) {
-                                        // **INÍCIO DA CORREÇÃO**
-                                        // Formata a data manualmente para o formato ISO sem aplicar o fuso horário local.
-                                        // Isso garante que o horário exato do arquivo seja preservado.
                                         const year = d.getFullYear();
                                         const month = String(d.getMonth() + 1).padStart(2, '0');
                                         const day = String(d.getDate()).padStart(2, '0');
@@ -954,7 +951,6 @@
                                         const minutes = String(d.getMinutes()).padStart(2, '0');
                                         const seconds = String(d.getSeconds()).padStart(2, '0');
                                         finalDate = `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
-                                        // **FIM DA CORREÇÃO**
                                     }
                                 }
                                 const originalCombustivel = row['TIPO COMBUSTIVEL'];
@@ -977,25 +973,37 @@
                                     data_criacao: new Date().toISOString(),
                                 };
                             });
+
                             if (dataToInsert.length === 0) {
-                                showToast("Nenhum dado válido encontrado na planilha (ignorando a linha de total).", "info");
+                                showToast("Nenhum dado válido encontrado na planilha.", "info");
                                 setIsImporting(false);
                                 return;
                             }
                             
-                            // 1. Insere os dados principais
+                            // 1. Insere os abastecimentos no banco de dados
                             const { error } = await supabase.from('ticket_abastecimentos').insert(dataToInsert, { returning: 'minimal' });
-                            if (error) { console.error("Erro do Supabase:", error); throw error; }
-
-                            showToast(`${dataToInsert.length} registros importados com sucesso! Gerando alertas...`, "success");
+                            if (error) throw error;
                             
-                            // 2. Chama a geração de alertas em lote (processo rápido em segundo plano)
-                            gerarAlertasEmLote(dataToInsert, 'ticket').catch(err => {
-                                console.error("Erro ao gerar alertas em lote para Ticket:", err);
-                                showToast("Erro ao gerar alertas.", "error");
-                            });
+                            showToast(`${dataToInsert.length} registros importados! Sincronizando alertas...`, "success");
 
-                            // Limpa a interface imediatamente
+                            // **INÍCIO DA OTIMIZAÇÃO DE PERFORMANCE**
+                            // 2. Cria uma lista de promessas para todas as verificações de alerta
+                            const alertCheckPromises = [];
+                            for (const item of dataToInsert) {
+                                if (item.placa && item.data_transacao) {
+                                    const periodo = new Date(item.data_transacao).toLocaleDateString('pt-BR', { month: '2-digit', year: 'numeric' });
+                                    // Adiciona as verificações à lista SEM o 'await'
+                                    alertCheckPromises.push(verificarExistenciaPlacaExterna(item.placa, periodo));
+                                    alertCheckPromises.push(verificarDuplicidadePlataforma(item.placa, item.data_transacao, 'ticket'));
+                                }
+                            }
+                            
+                            // 3. Executa todas as verificações em paralelo
+                            await Promise.all(alertCheckPromises);
+                            console.log("Sincronização de alertas finalizada.");
+                            // **FIM DA OTIMIZAÇÃO**
+
+                            // Limpa a interface
                             setFile(null); 
                             document.getElementById('file-input-ticket').value = '';
                             setHasSearched(false);
@@ -1148,19 +1156,30 @@
                                 return;
                             }
                             
-                            // 1. Insere os dados principais
+                            // 1. Insere os abastecimentos no banco de dados
                             const { error } = await supabase.from('shell_abastecimentos').insert(dataToInsert, { returning: 'minimal' });
-                            if (error) { console.error("Erro do Supabase:", error); throw error; }
-                            
-                            showToast(`${dataToInsert.length} registros importados com sucesso! Gerando alertas...`, "success");
+                            if (error) throw error;
 
-                            // 2. Chama a geração de alertas em lote (processo rápido em segundo plano)
-                             gerarAlertasEmLote(dataToInsert, 'shell').catch(err => {
-                                console.error("Erro ao gerar alertas em lote para Shell:", err);
-                                showToast("Erro ao gerar alertas.", "error");
-                            });
+                            showToast(`${dataToInsert.length} registros importados! Sincronizando alertas...`, "success");
 
-                            // Limpa a interface imediatamente
+                            // **INÍCIO DA OTIMIZAÇÃO DE PERFORMANCE**
+                            // 2. Cria uma lista de promessas para todas as verificações de alerta
+                            const alertCheckPromises = [];
+                            for (const item of dataToInsert) {
+                                if (item.placa && item.data_hora_transacao) {
+                                    const periodo = new Date(item.data_hora_transacao).toLocaleDateString('pt-BR', { month: '2-digit', year: 'numeric' });
+                                    // Adiciona as verificações à lista SEM o 'await'
+                                    alertCheckPromises.push(verificarExistenciaPlacaExterna(item.placa, periodo));
+                                    alertCheckPromises.push(verificarDuplicidadePlataforma(item.placa, item.data_hora_transacao, 'shell'));
+                                }
+                            }
+
+                            // 3. Executa todas as verificações em paralelo
+                            await Promise.all(alertCheckPromises);
+                            console.log("Sincronização de alertas finalizada.");
+                            // **FIM DA OTIMIZAÇÃO**
+
+                            // Limpa a interface
                             setFile(null); 
                             document.getElementById('file-input-shell').value = '';
                             setHasSearched(false);
