@@ -115,7 +115,60 @@
                     dangerouslySetInnerHTML: { __html: icons[name] || '' }
                 });
             }
+async function verificarDuplicidadePlataforma(placa, dataTransacao, plataformaAtual) {
+                if (!placa || !dataTransacao) return;
 
+                try {
+                    const dataObj = new Date(dataTransacao);
+                    const periodo = dataObj.toLocaleDateString('pt-BR', { month: '2-digit', year: 'numeric' });
+                    const tipoAlerta = "Abastecimento em 2 plataformas";
+
+                    // 1. Evitar alertas duplicados
+                    const { data: alertaExistente, error: checkError } = await supabase
+                        .from('alertas')
+                        .select('id')
+                        .eq('placa', placa)
+                        .eq('periodo', periodo)
+                        .eq('tipo_alerta', tipoAlerta)
+                        .maybeSingle();
+                    
+                    if (checkError) throw checkError;
+                    if (alertaExistente) return;
+
+                    // 2. Definir qual tabela consultar
+                    const tabelaParaVerificar = plataformaAtual === 'ticket' ? 'shell_abastecimentos' : 'ticket_abastecimentos';
+                    const colunaDataParaVerificar = plataformaAtual === 'ticket' ? 'data_hora_transacao' : 'data_transacao';
+
+                    // 3. Definir o intervalo do mês
+                    const primeiroDia = new Date(dataObj.getFullYear(), dataObj.getMonth(), 1);
+                    const ultimoDia = new Date(dataObj.getFullYear(), dataObj.getMonth() + 1, 0, 23, 59, 59);
+
+                    // 4. Consultar a outra tabela
+                    const { data, error } = await supabase
+                        .from(tabelaParaVerificar)
+                        .select('id')
+                        .eq('placa', placa)
+                        .gte(colunaDataParaVerificar, primeiroDia.toISOString())
+                        .lte(colunaDataParaVerificar, ultimoDia.toISOString())
+                        .maybeSingle();
+
+                    if (error) throw error;
+
+                    // 5. Se encontrou um registro na outra tabela, cria o alerta
+                    if (data) {
+                        await supabase
+                            .from('alertas')
+                            .insert([{ 
+                                placa: placa,
+                                periodo: periodo,
+                                tipo_alerta: tipoAlerta,
+                                status: 'pendente'
+                            }]);
+                    }
+                } catch (err) {
+                    console.error('Erro ao verificar duplicidade de plataforma:', err);
+                }
+            }
             function Toast({ message, type, onClose }) {
                 const bgColor = type === 'success' ? 'bg-green-500' : 'bg-red-500';
                 React.useEffect(() => {
@@ -931,6 +984,7 @@
                                 if(item.placa && item.data_transacao) {
                                     const periodo = new Date(item.data_transacao).toLocaleDateString('pt-BR', { month: '2-digit', year: 'numeric' });
                                     await verificarEGerarAlertaDeEncerramento(item.placa, periodo);
+                                    await verificarDuplicidadePlataforma(item.placa, item.data_transacao, 'ticket');
                                 }
                             }
 
@@ -1092,6 +1146,7 @@
                                 if(item.placa && item.data_hora_transacao) {
                                     const periodo = new Date(item.data_hora_transacao).toLocaleDateString('pt-BR', { month: '2-digit', year: 'numeric' });
                                     await verificarEGerarAlertaDeEncerramento(item.placa, periodo);
+                                    await verificarDuplicidadePlataforma(item.placa, item.data_hora_transacao, 'shell');
                                 }
                             }
 
