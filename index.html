@@ -504,10 +504,10 @@
                                     }
                                 }
                                 return {
-                                    cod_posto: row['Cod Posto'],
-                                    volume: parseFloat(row['Volume']) || 0,
-                                    custo: parseFloat(row['Custo']) || 0,
-                                    preco_por_litro: parseFloat(row['Preço p/ Litro']) || 0,
+                                    cod_posto: row['Cod. do Posto'],
+                                    volume: parseFloat(row['Volume (l)']) || 0,
+                                    custo: parseFloat(row['Custo (R$)']) || 0,
+                                    preco_por_litro: parseFloat(row['Preço por Litro/M³']) || 0,
                                     nota_fiscal: row['Nota Fiscal'],
                                     fornecedor: row['Fornecedor'],
                                     entrega: deliveryDate,
