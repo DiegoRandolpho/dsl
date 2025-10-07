@@ -61,14 +61,13 @@
             // 1. CONFIGURAÇÃO
             // ================================================================
             const SUPABASE_URL = 'https://ikypygpbdmoxozfmwewr.supabase.co';
+            // ATENÇÃO: A CHAVE ABAIXO PARECE ESTAR INCORRETA/INVALIDADA. SUBSTITUA PELA CHAVE DO SEU PAINEL SUPABASE.
             const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlreXB5Z3BiZG1veG96Zm13ZXdyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkxNTE0MTYsImV4cCI6MjA3NDcyNzQxNn0.IWoX896KWVC9p1M9EcFTOk6YhSljDOtxIl3yPxZS0Xg';
             let supabase;
 
-            // ***** INÍCIO DA NOVA CONFIGURAÇÃO - PROJETO 2 *****
             const SUPABASE_URL_PROJETO_2 = 'https://gfivmnnysomfwrffybeh.supabase.co';
             const SUPABASE_ANON_KEY_PROJETO_2 = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdmaXZtbm55c29tZndyZmZ5YmVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMyOTY3NjgsImV4cCI6MjA2ODg3Mjc2OH0.NxetXJoCLh4q9zAqn_olimziI3YP4MAJzB8ed4qf8cg';
             let supabaseProjeto2;
-            // ***** FIM DA NOVA CONFIGURAÇÃO *****
 
             // ================================================================
             // 2. COMPONENTES AUXILIARES (Helpers)
@@ -95,7 +94,7 @@
 
                     if (error) throw new Error(`Erro ao consultar a placa no segundo projeto: ${error.message}`);
                     
-                    if (data && data.status !== 'Ativo') { // <-- AJUSTE A CONDIÇÃO AQUI CONFORME SUA BASE
+                    if (data && data.status !== 'Ativo') {
                         await supabase
                             .from('alertas')
                             .insert([{ 
@@ -1528,6 +1527,13 @@
                 const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
                 const [openMenu, setOpenMenu] = React.useState('');
                 const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(false);
+                
+                // URLs dos ícones personalizados
+                const ctaIconUrl = 'https://ikypygpbdmoxozfmwewr.supabase.co/storage/v1/object/sign/ICONS/CTAICON.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9lMGJiMDk5Zi1jZmE5LTQ5Y2UtYjUwNy0wZmE2ZWZkYWYxOTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJJQ09OUy9DVEFJQ09OLnBuZyIsImlhdCI6MTc1OTg2NTA1OSwiZXhwIjoyMDc1MjI1MDU5fQ.xnv-1nyrxg9XsQxLr7uoUQs2rpgzBeSfWXoX8Y37Y-U';
+                const ticketIconUrl = 'https://ikypygpbdmoxozfmwewr.supabase.co/storage/v1/object/sign/ICONS/TICKET.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9lMGJiMDk5Zi1jZmE5LTQ5Y2UtYjUwNy0wZmE2ZWZkYWYxOTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJJQ09OUy9USUNLRVQucG5nIiwiaWF0IjoxNzU5ODY1MTkzLCJleHAiOjIwNzUyMjUxOTN9.EUaHSgL2RjDC8Dt2XWtibSNhh6NtPy8G-3kFQHDpvQY';
+                const shellIconUrl = 'https://ikypygpbdmoxozfmwewr.supabase.co/storage/v1/object/sign/ICONS/Shell-958x575-1-Photoroom-Photoroom.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9lMGJiMDk5Zi1jZmE5LTQ5Y2UtYjUwNy0wZmE2ZWZkYWYxOTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJJQ09OUy9TaGVsbC05NTh4NTc1LTEtUGhvdG9yb29tLVBob3Rvcm9vbS5wbmciLCJpYXQiOjE3NTk4NjUyMTAsImV4cCI6MjA3NTIyNTIxMH0.gw9lTQcpcCYLyYgX1GP2BsZcT8Hg2o7eCyNO_b8fqM0';
+
+
                 const handleLogin = (userData) => {
                     localStorage.setItem('userSession', JSON.stringify(userData));
                     setUser(userData);
@@ -1572,13 +1578,28 @@
                 }
 
                 const MenuItem = ({ page, icon, text }) => {
-                    const isActive = currentPage === page;
-                    return React.createElement('li', null,
-                        React.createElement('button', {
+                   const isActive = currentPage === page;
+                   let iconElement;
+                   
+                   if (typeof icon === 'string' && icon.startsWith('http')) {
+                       iconElement = React.createElement('img', {
+                           src: icon,
+                           alt: text,
+                           className: `h-5 w-5 flex-shrink-0 ${!isSidebarCollapsed && 'mr-3'}`
+                       });
+                   } else {
+                       iconElement = React.createElement(LucideIcon, {
+                           name: icon,
+                           className: `h-5 w-5 flex-shrink-0 ${!isSidebarCollapsed && 'mr-3'}`
+                       });
+                   }
+
+                   return React.createElement('li', null,
+                       React.createElement('button', {
                            onClick: () => { setCurrentPage(page); setIsSidebarOpen(false); },
                            className: `flex items-center w-full px-4 py-2 rounded-lg transition-colors ${isSidebarCollapsed ? 'justify-center' : ''} ${isActive ? 'bg-blue-600 text-white' : 'hover:bg-gray-700 text-gray-300'}`
-                        },
-                           React.createElement(LucideIcon, { name: icon, className: `h-5 w-5 flex-shrink-0 ${!isSidebarCollapsed && 'mr-3'}` }),
+                       },
+                           iconElement,
                            !isSidebarCollapsed && React.createElement('span', {className: 'truncate'}, text)
                        )
                     );
@@ -1586,6 +1607,21 @@
                 
                 const MenuCategory = ({ title, icon, children, menuKey }) => {
                     const isOpen = openMenu === menuKey;
+                    let iconElement;
+
+                    if (typeof icon === 'string' && icon.startsWith('http')) {
+                         iconElement = React.createElement('img', {
+                             src: icon,
+                             alt: title,
+                             className: `h-5 w-5 flex-shrink-0 ${!isSidebarCollapsed && 'mr-3'}`
+                         });
+                    } else {
+                         iconElement = React.createElement(LucideIcon, {
+                             name: icon,
+                             className: `h-5 w-5 flex-shrink-0 ${!isSidebarCollapsed && 'mr-3'}`
+                         });
+                    }
+
                     return (
                         React.createElement('li', { className: "mb-2" },
                             React.createElement('button', {
@@ -1593,7 +1629,7 @@
                                 className: `flex items-center w-full px-4 py-2 rounded-lg transition-colors ${isSidebarCollapsed ? 'justify-center' : ''} ${!isSidebarCollapsed ? 'justify-between' : ''} ${isOpen && !isSidebarCollapsed ? 'bg-gray-700' : 'hover:bg-gray-700'} text-gray-200`
                             },
                                 React.createElement('span', {className: 'flex items-center truncate'},
-                                    React.createElement(LucideIcon, { name: icon, className: `h-5 w-5 flex-shrink-0 ${!isSidebarCollapsed && 'mr-3'}` }),
+                                    iconElement,
                                     !isSidebarCollapsed && React.createElement('span', {className: 'truncate'}, title)
                                 ),
                                 !isSidebarCollapsed && React.createElement(LucideIcon, { name: isOpen ? "ChevronUp" : "ChevronDown", className: "h-5 w-5 flex-shrink-0" })
@@ -1618,10 +1654,10 @@
                                 React.createElement('ul', { className: "space-y-2" },
                                     React.createElement(MenuItem, { page: 'dashboard', icon: 'LayoutDashboard', text: 'Dashboard' }),
                                     React.createElement(MenuCategory, { title: "Importação", icon: "PlusCircle", menuKey: "importacao" },
-                                        React.createElement(MenuItem, { page: 'ticketAbastecimentos', icon: 'Ticket', text: 'Ticket Abastecimentos' }),
-                                        React.createElement(MenuItem, { page: 'ctaAbastecimentos', icon: 'Fuel', text: 'CTA Abastecimentos' }),
-                                        React.createElement(MenuItem, { page: 'ctaCarregamentos', icon: 'Ship', text: 'CTA Carregamentos' }),
-                                        React.createElement(MenuItem, { page: 'shellAbastecimentos', icon: 'Fuel', text: 'Shell Abastecimentos' })
+                                        React.createElement(MenuItem, { page: 'ticketAbastecimentos', icon: ticketIconUrl, text: 'Ticket Abastecimentos' }),
+                                        React.createElement(MenuItem, { page: 'ctaAbastecimentos', icon: ctaIconUrl, text: 'CTA Abastecimentos' }),
+                                        React.createElement(MenuItem, { page: 'ctaCarregamentos', icon: ctaIconUrl, text: 'CTA Carregamentos' }),
+                                        React.createElement(MenuItem, { page: 'shellAbastecimentos', icon: shellIconUrl, text: 'Shell Abastecimentos' })
                                     ),
                                     React.createElement(MenuCategory, { title: "Operacional", icon: "Settings", menuKey: "operacional" },
                                         React.createElement(MenuItem, { page: 'alertas', icon: 'FileText', text: 'Alertas' }),
