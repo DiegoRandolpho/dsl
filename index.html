@@ -481,7 +481,173 @@
                     )
                 );
             }
+function ShellAbastecimentos({ user, showToast }) {
+                const [abastecimentos, setAbastecimentos] = React.useState([]);
+                const [isLoading, setIsLoading] = React.useState(false);
+                const [file, setFile] = React.useState(null);
+                const [isImporting, setIsImporting] = React.useState(false);
+                const [filters, setFilters] = React.useState({ placa: '', data_inicio: null, data_fim: null, cnpj: '' });
+                const [hasSearched, setHasSearched] = React.useState(false);
 
+                const [combustivelMap, setCombustivelMap] = React.useState(new Map());
+                React.useEffect(() => {
+                    const fetchMapping = async () => {
+                        const { data, error } = await supabase.from('combustivel_mapeamento').select('nome_original, nome_padronizado');
+                        if (error) {
+                            showToast("Aviso: Não foi possível carregar as regras de mapeamento de combustível.", "error");
+                        } else {
+                            const map = new Map(data.map(rule => [rule.nome_original, rule.nome_padronizado]));
+                            setCombustivelMap(map);
+                        }
+                    };
+                    fetchMapping();
+                }, [showToast]);
+
+                const formatDate = (dateString) => {
+                    if (!dateString) return '—';
+                    return new Date(dateString).toLocaleString('pt-BR');
+                };
+                const handleFilterChange = (e) => {
+                    setFilters(prev => ({ ...prev, [e.target.name]: e.target.value }));
+                };
+                const handleSearch = async () => {
+                    setHasSearched(true);
+                    setIsLoading(true);
+                    try {
+                        let query = supabase.from('shell_abastecimentos').select('*');
+                        if (filters.placa) query = query.ilike('placa', `%${filters.placa.trim()}%`);
+                        if (filters.cnpj) query = query.ilike('cnpj', `%${filters.cnpj.trim()}%`);
+                        if (filters.data_inicio) {
+                            query = query.gte('data_hora_transacao', filters.data_inicio.toISOString());
+                        }
+                        if (filters.data_fim) {
+                            const endDate = new Date(filters.data_fim);
+                            endDate.setHours(23, 59, 59, 999);
+                            query = query.lte('data_hora_transacao', endDate.toISOString());
+                        }
+                        query = query.order('data_hora_transacao', { ascending: false });
+                        const { data, error } = await query;
+                        if (error) throw error;
+                        setAbastecimentos(data || []);
+                    } catch (err) {
+                        showToast("Erro ao buscar abastecimentos.", "error");
+                    }
+                    setIsLoading(false);
+                };
+                const handleFileChange = (e) => {
+                    if (e.target.files && e.target.files[0]) {
+                        setFile(e.target.files[0]);
+                    }
+                };
+                const handleImport = () => {
+                    if (!file) { return showToast("Por favor, selecione um arquivo.", "error"); }
+                    setIsImporting(true);
+                    const reader = new FileReader();
+                    reader.onload = async (e) => {
+                        try {
+                            const data = new Uint8Array(e.target.result);
+                            const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+                            const sheetName = workbook.SheetNames[0];
+                            const worksheet = workbook.Sheets[sheetName];
+                            const json = XLSX.utils.sheet_to_json(worksheet);
+                            const dataToInsert = json
+                                .filter(row => row['Status'] && row['Status'].toLowerCase() === 'sucesso')
+                                // NOVO FILTRO ADICIONADO AQUI para ignorar o CNPJ específico
+                                .filter(row => row['CNPJ do posto'] !== "07015016000117")
+                                .map(row => {
+                                    const transacaoDate = row['Data/Hora transação'];
+                                    let finalDate = null;
+                                    if (transacaoDate) {
+                                        const d = new Date(transacaoDate);
+                                        if (!isNaN(d.getTime())) { finalDate = d.toISOString(); }
+                                    }
+                                    return {
+                                        cnpj: row['CNPJ do posto'],
+                                        status: row['Status'],
+                                        data_hora_transacao: finalDate,
+                                        cidade: row['Cidade do posto'],
+                                        estado: row['Estado do posto'],
+                                        placa: row['Placa'],
+                                        combustivel: row['Combustível'],
+                                        litros: parseFloat(row['Litros']) || 0,
+                                        total_abastecimento: parseFloat(row['Total do Abastecimento']) || 0,
+                                        rs_litro: parseFloat(row['R$/Litro']) || 0,
+                                        nome_condutor: row['Nome do condutor'],
+                                        nome_posto: row['Nome do posto'],
+                                        usuario_criacao: user.nome,
+                                        data_criacao: new Date().toISOString(),
+                                    };
+                                });
+
+                            if (dataToInsert.length === 0) {
+                                showToast("Nenhum registro válido (com status 'Sucesso' e CNPJ permitido) foi encontrado na planilha.", "info");
+                                setIsImporting(false);
+                                return;
+                            }
+                            
+                            const { error } = await supabase.from('shell_abastecimentos').insert(dataToInsert, { returning: 'minimal' });
+                            if (error) { console.error("Erro do Supabase:", error); throw error; }
+                            
+                            showToast(`${dataToInsert.length} registros importados! Sincronizando alertas...`, "success");
+
+                            const dadosParaAlerta = dataToInsert.map(item => ({ placa: item.placa, data: item.data_hora_transacao, combustivelOriginal: item.combustivel }));
+                            gerarAlertasEmLote(dadosParaAlerta, 'shell', combustivelMap).catch(err => {
+                                console.error("Erro ao gerar alertas em lote para Shell:", err);
+                                showToast("Erro ao gerar alertas.", "error");
+                            });
+
+                            setFile(null); 
+                            document.getElementById('file-input-shell').value = '';
+                            setHasSearched(false);
+                            setAbastecimentos([]);
+                        } catch (err) {
+                            showToast(`Erro ao processar o arquivo: ${err.message}`, "error");
+                        }
+                        setIsImporting(false);
+                    };
+                    reader.readAsArrayBuffer(file);
+                };
+
+                return React.createElement('div', { className: "bg-white p-6 rounded-xl shadow-lg" },
+                    React.createElement('h2', { className: "text-2xl font-bold text-gray-800 mb-6 text-center" }, "Importação Shell"),
+                    React.createElement('div', { className: "mb-8 p-4 border rounded-lg bg-gray-100 grid grid-cols-1 md:grid-cols-2 gap-4 items-end" },
+                        React.createElement('div', null,
+                            React.createElement('label', { htmlFor: 'file-input-shell', className: "block text-sm font-medium text-gray-700 mb-1" }, "Importar Planilha Shell"),
+                            React.createElement('input', { id: 'file-input-shell', type: "file", onChange: handleFileChange, className: "w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100", accept: ".xlsx, .xls, .csv" })
+                        ),
+                        React.createElement('button', { onClick: handleImport, disabled: isImporting, className: "w-full p-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 transition" }, isImporting ? 'Importando...' : 'Importar Dados')
+                    ),
+                    React.createElement('div', { className: "mb-6 p-4 border rounded-lg bg-gray-50 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end" },
+                        React.createElement('div', { className: "lg:col-span-2" },
+                            React.createElement(DateRangePicker, { onDatesChange: (dates) => { setFilters(prev => ({...prev, data_inicio: dates[0] || null, data_fim: dates[1] || null })); } })
+                        ),
+                        React.createElement('div', null, React.createElement('label', { className: "block text-sm font-medium" }, "Placa"), React.createElement('input', { type: "text", name: "placa", value: filters.placa, onChange: handleFilterChange, className: "mt-1 w-full p-2 border rounded" })),
+                        React.createElement('div', null, React.createElement('label', { className: "block text-sm font-medium" }, "CNPJ do Posto"), React.createElement('input', { type: "text", name: "cnpj", value: filters.cnpj, onChange: handleFilterChange, className: "mt-1 w-full p-2 border rounded" })),
+                        React.createElement('button', { onClick: handleSearch, disabled: isLoading, className: "w-full p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition lg:col-start-4" }, 'Buscar')
+                    ),
+                    React.createElement('div', { className: "rounded-lg border border-slate-200 shadow-sm overflow-hidden" },
+                        React.createElement('table', { className: "w-full text-sm text-left text-slate-600" },
+                            React.createElement('thead', { className: "text-xs text-slate-700 uppercase bg-slate-100" },
+                                React.createElement('tr', null,
+                                    ["Data", "Placa", "Posto", "Litros", "Valor Total"].map(h => React.createElement('th', { key: h, className: "px-6 py-4 font-semibold border-b border-r border-slate-200 last:border-r-0" }, h))
+                                )
+                            ),
+                            React.createElement('tbody', null,
+                                isLoading ? React.createElement('tr', null, React.createElement('td', { colSpan: 5, className: "p-4 text-center" }, "Carregando...")) :
+                                !hasSearched ? React.createElement('tr', null, React.createElement('td', { colSpan: 5, className: "p-6 text-center text-slate-500" }, "Utilize os filtros para buscar os abastecimentos.")) :
+                                abastecimentos.length === 0 ? React.createElement('tr', null, React.createElement('td', { colSpan: 5, className: "p-6 text-center text-slate-500" }, "Nenhum resultado encontrado.")) :
+                                abastecimentos.map(item => React.createElement('tr', { key: item.id, className: "hover:bg-blue-50 even:bg-slate-50" },
+                                    React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, formatDate(item.data_hora_transacao)),
+                                    React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, React.createElement('span', { className: 'font-medium text-slate-800' }, item.placa)),
+                                    React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, item.nome_posto),
+                                    React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, item.litros.toFixed(2)),
+                                    React.createElement('td', { className: "px-6 py-4" }, `R$ ${(item.total_abastecimento || 0).toFixed(2).replace('.', ',')}`)
+                                ))
+                            )
+                        )
+                    )
+                );
+            }
             function CtaCarregamentos({ user, showToast }) {
                 const [carregamentos, setCarregamentos] = React.useState([]);
                 const [isLoading, setIsLoading] = React.useState(false);
