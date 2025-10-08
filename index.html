@@ -532,7 +532,6 @@
                     const fetchAlertCounts = async () => {
                         setIsLoading(true);
                         try {
-                            // Esta query busca os alertas pendentes e junta com a tabela de prioridades
                             const { data, error } = await supabase
                                 .from('alertas')
                                 .select(`
@@ -543,7 +542,6 @@
 
                             if (error) throw error;
                             
-                            // Processa os dados para contar
                             const counts = data.reduce((acc, alerta) => {
                                 const prioridade = alerta.alerta_prioridades?.prioridade || 'N/D';
                                 if (acc[prioridade]) {
@@ -570,7 +568,7 @@
                 const Card = ({ prioridade, cor, quantidade }) => (
                     React.createElement('div', { 
                         className: `bg-white p-6 rounded-xl shadow-lg border-l-4 ${cor} cursor-pointer hover:shadow-xl transition-shadow`,
-                        onClick: () => setCurrentPage('alertas') // Ação de clique para ir para a tela de alertas
+                        onClick: () => setCurrentPage('alertas')
                     },
                         React.createElement('p', { className: 'text-sm font-medium text-gray-500' }, `Alertas de Prioridade ${prioridade}`),
                         React.createElement('p', { className: 'text-4xl font-bold text-gray-800 mt-2' }, isLoading ? '...' : quantidade)
@@ -584,7 +582,6 @@
                         React.createElement(Card, { prioridade: 'Alta', cor: 'border-red-500', quantidade: alertCounts.Alta }),
                         React.createElement(Card, { prioridade: 'Média', cor: 'border-yellow-500', quantidade: alertCounts.Média }),
                         React.createElement(Card, { prioridade: 'Baixa', cor: 'border-blue-500', quantidade: alertCounts.Baixa }),
-                        // Card de Total
                         React.createElement('div', { 
                             className: `bg-gray-800 text-white p-6 rounded-xl shadow-lg cursor-pointer hover:shadow-xl transition-shadow`,
                             onClick: () => setCurrentPage('alertas')
@@ -1427,11 +1424,55 @@ function ShellAbastecimentos({ user, showToast }) {
                 const [showBulkObservacao, setShowBulkObservacao] = React.useState(false);
                 const [bulkObservacao, setBulkObservacao] = React.useState('');
                 
-                // NOVO ESTADO PARA O FILTRO DE PRIORIDADE
                 const [filterPrioridade, setFilterPrioridade] = React.useState('todas');
 
                 const MultiPeriodoPicker = ({ allPeriods, selectedPeriods, onChange }) => {
-                    // ... (componente MultiPeriodoPicker inalterado)
+                    const [isOpen, setIsOpen] = React.useState(false);
+                    const ref = React.useRef(null);
+
+                    const handlePeriodToggle = (period) => {
+                        const newSelection = new Set(selectedPeriods);
+                        if (newSelection.has(period)) {
+                            newSelection.delete(period);
+                        } else {
+                            newSelection.add(period);
+                        }
+                        onChange(Array.from(newSelection));
+                    };
+                    
+                    React.useEffect(() => {
+                        const handleClickOutside = (event) => {
+                            if (ref.current && !ref.current.contains(event.target)) {
+                                setIsOpen(false);
+                            }
+                        };
+                        document.addEventListener("mousedown", handleClickOutside);
+                        return () => document.removeEventListener("mousedown", handleClickOutside);
+                    }, [ref]);
+
+                    const displayLabel = selectedPeriods.length === 0 ? 'Selecione o(s) período(s)...' : 
+                                       selectedPeriods.length === 1 ? selectedPeriods[0] : 
+                                       `${selectedPeriods.length} períodos selecionados`;
+
+                    return React.createElement('div', { className: 'relative', ref: ref },
+                        React.createElement('button', { onClick: () => setIsOpen(!isOpen), className: 'w-full p-2 border rounded bg-white text-left flex justify-between items-center' },
+                            React.createElement('span', { className: 'truncate' }, displayLabel),
+                            React.createElement(LucideIcon, { name: isOpen ? 'ChevronUp' : 'ChevronDown', className: 'h-5 w-5 text-gray-400' })
+                        ),
+                        isOpen && React.createElement('div', { className: 'absolute z-10 w-full mt-1 bg-white border rounded shadow-lg max-h-60 overflow-y-auto' },
+                            allPeriods.map(period =>
+                                React.createElement('label', { key: period, className: 'flex items-center p-2 hover:bg-gray-100 cursor-pointer' },
+                                    React.createElement('input', {
+                                        type: 'checkbox',
+                                        className: 'h-4 w-4 mr-2',
+                                        checked: selectedPeriods.includes(period),
+                                        onChange: () => handlePeriodToggle(period)
+                                    }),
+                                    period
+                                )
+                            )
+                        )
+                    );
                 };
 
                 const fetchAlertas = React.useCallback(async () => {
@@ -1439,13 +1480,11 @@ function ShellAbastecimentos({ user, showToast }) {
                     try {
                         const { data: alertasData, error: alertasError } = await supabase
                             .from('alertas')
-                            // Agora fazemos o JOIN para já buscar a prioridade na consulta principal
                             .select('*, alerta_prioridades ( prioridade, cor_badge )')
                             .order('data_criacao', { ascending: false });
 
                         if (alertasError) throw alertasError;
                         
-                        // Processa os dados para popular o mapa de prioridades e os alertas
                         const prioridadesMap = new Map();
                         const alertasComPrioridade = alertasData.map(a => {
                             const tipoBase = a.tipo_alerta.startsWith('Combustível não mapeado:') ? 'Combustível não mapeado' : a.tipo_alerta;
@@ -1482,15 +1521,84 @@ function ShellAbastecimentos({ user, showToast }) {
                         const matchStatus = filterStatus === 'todos' || alerta.status === filterStatus;
                         const matchSearch = !searchTerm || (alerta.placa && alerta.placa.toLowerCase().includes(searchTerm.toLowerCase()));
                         const matchPeriod = selectedPeriods.length === 0 || selectedPeriods.includes(alerta.periodo);
-                        // LÓGICA DO NOVO FILTRO DE PRIORIDADE
                         const matchPrioridade = filterPrioridade === 'todas' || alerta.prioridadeInfo?.prioridade === filterPrioridade;
                         return matchStatus && matchSearch && matchPeriod && matchPrioridade;
                     });
                 }, [alertas, filterStatus, searchTerm, selectedPeriods, filterPrioridade]);
 
-                // ... (O restante das funções handle... permanecem as mesmas)
+                const handleSelectAlert = (id) => {
+                    const newSelection = new Set(selectedAlerts);
+                    if (newSelection.has(id)) {
+                        newSelection.delete(id);
+                    } else {
+                        newSelection.add(id);
+                    }
+                    setSelectedAlerts(newSelection);
+                    setShowBulkObservacao(false);
+                };
+
+                const handleBulkConclude = async () => {
+                    if (selectedAlerts.size === 0) return;
+                    setIsLoading(true);
+                    
+                    const { error } = await supabase
+                        .from('alertas')
+                        .update({ 
+                            status: 'concluido', 
+                            observacao: bulkObservacao.trim(),
+                            usuario_conclusao: user.nome,
+                            data_conclusao: new Date().toISOString()
+                        })
+                        .in('id', [...selectedAlerts]);
+
+                    if (error) {
+                        showToast("Erro ao concluir alertas.", "error");
+                    } else {
+                        showToast(`${selectedAlerts.size} alertas concluídos com sucesso!`, "success");
+                        setSelectedAlerts(new Set());
+                        setShowBulkObservacao(false);
+                        setBulkObservacao('');
+                        fetchAlertas();
+                    }
+                    setIsLoading(false);
+                };
+
+                const handleShowDetails = async (alerta) => {
+                    setDetailedAlert(alerta);
+                    setIsDetailLoading(true);
+                    try {
+                        if (alerta.tipo_alerta === 'Aferição não realizada') {
+                            setDetailedAbastecimentos([]);
+                            setIsDetailLoading(false);
+                            return;
+                        }
+
+                        const [mes, ano] = alerta.periodo.split('/');
+                        const primeiroDia = new Date(ano, mes - 1, 1);
+                        const ultimoDia = new Date(ano, mes, 0, 23, 59, 59);
+
+                        const [ticketRes, shellRes] = await Promise.all([
+                            supabase.from('ticket_abastecimentos').select('*').eq('placa', alerta.placa).gte('data_transacao', primeiroDia.toISOString()).lte('data_transacao', ultimoDia.toISOString()),
+                            supabase.from('shell_abastecimentos').select('*').eq('placa', alerta.placa).gte('data_hora_transacao', primeiroDia.toISOString()).lte('data_hora_transacao', ultimoDia.toISOString())
+                        ]);
+
+                        if(ticketRes.error || shellRes.error) throw new Error("Falha ao buscar abastecimentos.");
+
+                        const combined = [
+                            ...(ticketRes.data || []).map(a => ({...a, plataforma: 'Ticket'})),
+                            ...(shellRes.data || []).map(a => ({...a, plataforma: 'Shell'}))
+                        ];
+                        setDetailedAbastecimentos(combined);
+
+                    } catch (err) {
+                        showToast(err.message, "error");
+                    } finally {
+                        setIsDetailLoading(false);
+                    }
+                };
                 
                 const AlertCard = ({ alerta }) => {
+                    const tipoAlertaBase = alerta.tipo_alerta.startsWith('Combustível não mapeado:') ? 'Combustível não mapeado' : alerta.tipo_alerta;
                     const alertaPrioridade = alerta.prioridadeInfo ? { prioridade: alerta.prioridadeInfo.prioridade, cor: alerta.prioridadeInfo.cor_badge } : { prioridade: 'N/D', cor: 'bg-gray-400 text-white' };
                     const labelPrincipal = alerta.tipo_alerta === 'Aferição não realizada' ? 'Tanque' : 'Placa';
 
@@ -1510,6 +1618,24 @@ function ShellAbastecimentos({ user, showToast }) {
                         )
                     );
                 };
+
+                const AlertDetailsModal = () => (
+                    React.createElement('div', { className: "fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50", onClick: () => setDetailedAlert(null) },
+                        React.createElement('div', { className: "bg-white p-6 rounded-xl shadow-2xl max-w-4xl w-full text-left", onClick: (e) => e.stopPropagation() },
+                            React.createElement('h3', { className: 'text-xl font-bold mb-4' }, `Detalhes do Alerta - ${detailedAlert?.tipo_alerta === 'Aferição não realizada' ? 'Tanque' : 'Placa'} ${detailedAlert?.placa}`),
+                            isDetailLoading ? React.createElement('p', null, 'Carregando detalhes...') : 
+                            detailedAlert?.tipo_alerta === 'Aferição não realizada' ? React.createElement('p', null, 'Este tipo de alerta não possui abastecimentos detalhados.') :
+                            detailedAbastecimentos.length === 0 ? React.createElement('p', null, 'Nenhum abastecimento encontrado para este alerta.') :
+                            React.createElement('div', { className: 'max-h-96 overflow-y-auto' },
+                                React.createElement('table', { className: 'w-full text-sm' },
+                                    React.createElement('thead', {className: 'bg-gray-100'}, 
+                                        React.createElement('tr', null, ['Data', 'Plataforma', 'Litros', 'Valor Total'].map(h => React.createElement('th', { key: h, className: 'p-2 text-left font-semibold' }, h)))
+                                    ),
+                                    React.createElement('tbody', null, 
+                                        detailedAbastecimentos.map(a => React.createElement('tr', { key: a.id, className: 'border-b' },
+                                            React.createElement('td', { className: 'p-2' }, new Date(a.data_transacao || a.data_hora_transacao).toLocaleString('pt-BR')),
+                                            React.createElement('td', { className: 'p-2' }, a.plataforma),
+                                            React.createElement('td', { className: 'p-2' }, a.litros),
 
                 const AlertDetailsModal = () => (
                     // ... (componente do modal inalterado)
@@ -1821,11 +1947,10 @@ function ShellAbastecimentos({ user, showToast }) {
                 const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
                 const [openMenu, setOpenMenu] = React.useState('');
                 const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(false);
-                // URLs dos ícones personalizados
+                
                 const ctaIconUrl = 'https://ikypygpbdmoxozfmwewr.supabase.co/storage/v1/object/sign/ICONS/CTAICON.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9lMGJiMDk5Zi1jZmE5LTQ5Y2UtYjUwNy0wZmE2ZWZkYWYxOTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJJQ09OUy9DVEFJQ09OLnBuZyIsImlhdCI6MTc1OTg2NTA1OSwiZXhwIjoyMDc1MjI1MDU5fQ.xnv-1nyrxg9XsQxLr7uoUQs2rpgzBeSfWXoX8Y37Y-U';
                 const ticketIconUrl = 'https://ikypygpbdmoxozfmwewr.supabase.co/storage/v1/object/sign/ICONS/TICKET.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9lMGJiMDk5Zi1jZmE5LTQ5Y2UtYjUwNy0wZmE2ZWZkYWYxOTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJJQ09OUy9USUNLRVQucG5nIiwiaWF0IjoxNzU5ODY1MTkzLCJleHAiOjIwNzUyMjUxOTN9.EUaHSgL2RjDC8Dt2XWtibSNhh6NtPy8G-3kFQHDpvQY';
                 const shellIconUrl = 'https://ikypygpbdmoxozfmwewr.supabase.co/storage/v1/object/sign/ICONS/Shell-958x575-1-Photoroom-Photoroom.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9lMGJiMDk5Zi1jZmE5LTQ5Y2UtYjUwNy0wZmE2ZWZkYWYxOTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJJQ09OUy9TaGVsbC05NTh4NTc1LTEtUGhvdG9yb29tLVBob3Rvcm9vbS5wbmciLCJpYXQiOjE3NTk4NjUyMTAsImV4cCI6MjA3NTIyNTIxMH0.gw9lTQcpcCYLyYgX1GP2BsZcT8Hg2o7eCyNO_b8fqM0';
-
 
                 const handleLogin = (userData) => {
                     localStorage.setItem('userSession', JSON.stringify(userData));
@@ -1851,9 +1976,10 @@ function ShellAbastecimentos({ user, showToast }) {
                         setOpenMenu('');
                     }
                 };
+                
                 const renderPage = () => {
                     switch (currentPage) {
-                        case 'dashboard': return React.createElement(Dashboard, { user, showToast });
+                        case 'dashboard': return React.createElement(Dashboard, { user, showToast, setCurrentPage: setCurrentPage });
                         case 'ticketAbastecimentos': return React.createElement(TicketAbastecimentos, { user, showToast });
                         case 'ctaAbastecimentos': return React.createElement(CtaAbastecimentos, { user, showToast });
                         case 'ctaCarregamentos': return React.createElement(CtaCarregamentos, { user, showToast });
@@ -1863,9 +1989,10 @@ function ShellAbastecimentos({ user, showToast }) {
                         case 'cadastroFiliais': return user.nivel_permissao === 'administrador' ? React.createElement(CadastroFiliais, { user, showToast }) : null;
                         case 'mapeamentoCombustivel': return user.nivel_permissao === 'administrador' ? React.createElement(MapeamentoCombustivel, { user, showToast }) : null;
                         case 'userManagement': return React.createElement(UserManagement, { user, showToast });
-                        default: return React.createElement(Dashboard, { user, showToast });
+                        default: return React.createElement(Dashboard, { user, showToast, setCurrentPage: setCurrentPage });
                     }
                 };
+
                 if (!user) {
                     return React.createElement(LoginPage, { onLogin: handleLogin });
                 }
@@ -1878,7 +2005,6 @@ function ShellAbastecimentos({ user, showToast }) {
                        iconElement = React.createElement('img', {
                            src: icon,
                            alt: text,
-                           // AJUSTE: Adicionada a classe 'object-contain'
                            className: `h-5 w-5 flex-shrink-0 object-contain ${!isSidebarCollapsed && 'mr-3'}`
                        });
                    } else {
@@ -1907,7 +2033,6 @@ function ShellAbastecimentos({ user, showToast }) {
                          iconElement = React.createElement('img', {
                              src: icon,
                              alt: title,
-                             // AJUSTE: Adicionada a classe 'object-contain'
                              className: `h-5 w-5 flex-shrink-0 object-contain ${!isSidebarCollapsed && 'mr-3'}`
                          });
                     } else {
@@ -1995,7 +2120,6 @@ function ShellAbastecimentos({ user, showToast }) {
                     )
                 );
             }
-
             // ================================================================
             // 5. INICIALIZAÇÃO
             // ================================================================
