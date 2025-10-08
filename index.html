@@ -13,6 +13,8 @@
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://npmcdn.com/flatpickr/dist/l10n/pt.js"></script>
     <style>
         .login-bg-image-new {
@@ -1454,6 +1456,118 @@
                             )
                         )
                     )
+                );
+            }
+            function AnaliseGeografica({ user, showToast }) {
+                const [dadosPorCidade, setDadosPorCidade] = React.useState([]);
+                const [isLoading, setIsLoading] = React.useState(true);
+                const mapRef = React.useRef(null); // Ref para o container do mapa
+                const mapInstance = React.useRef(null); // Ref para a instância do mapa
+
+                React.useEffect(() => {
+                    const fetchData = async () => {
+                        setIsLoading(true);
+                        try {
+                            const [ticketRes, shellRes, ctaRes] = await Promise.all([
+                                supabase.from('ticket_abastecimentos').select('cidade, valor_emissao, litros'),
+                                supabase.from('shell_abastecimentos').select('cidade, total_abastecimento, litros'),
+                                // A tabela cta_abastecimentos não parece ter 'cidade', então a deixamos de fora desta análise
+                            ]);
+
+                            if (ticketRes.error || shellRes.error) throw new Error("Falha ao buscar dados de abastecimento.");
+
+                            const todosAbastecimentos = [
+                                ...(ticketRes.data || []).map(a => ({ cidade: a.cidade, custo: a.valor_emissao, volume: a.litros })),
+                                ...(shellRes.data || []).map(a => ({ cidade: a.cidade, custo: a.total_abastecimento, volume: a.litros })),
+                            ];
+
+                            const agregados = todosAbastecimentos.reduce((acc, abs) => {
+                                if (!abs.cidade || !abs.custo || !abs.volume) return acc;
+                                const cidade = abs.cidade.trim().toUpperCase();
+                                acc[cidade] = acc[cidade] || { custoTotal: 0, volumeTotal: 0, count: 0 };
+                                acc[cidade].custoTotal += abs.custo;
+                                acc[cidade].volumeTotal += abs.volume;
+                                acc[cidade].count++;
+                                return acc;
+                            }, {});
+
+                            const resultado = Object.entries(agregados).map(([cidade, dados]) => ({
+                                cidade,
+                                ...dados,
+                                precoMedio: dados.custoTotal / dados.volumeTotal || 0
+                            }));
+                            
+                            // Busca coordenadas para cada cidade (isso pode levar um tempo e tem limites de uso)
+                            const comCoordenadas = await Promise.all(resultado.map(async (item) => {
+                                try {
+                                    const response = await fetch(`https://nominatim.openstreetmap.org/search?city=${encodeURIComponent(item.cidade)}&country=Brazil&format=json&limit=1`);
+                                    const geodata = await response.json();
+                                    if (geodata && geodata.length > 0) {
+                                        return { ...item, lat: geodata[0].lat, lon: geodata[0].lon };
+                                    }
+                                } catch (e) { console.error("Erro de geocodificação:", e); }
+                                return { ...item, lat: null, lon: null }; // Retorna mesmo se falhar
+                            }));
+                            
+                            setDadosPorCidade(comCoordenadas.filter(c => c.lat)); // Apenas cidades encontradas
+
+                        } catch (err) {
+                            showToast("Erro ao carregar dados geográficos.", "error");
+                        }
+                        setIsLoading(false);
+                    };
+
+                    fetchData();
+                }, [showToast]);
+
+                // Efeito para inicializar e atualizar o mapa
+                React.useEffect(() => {
+                    if (isLoading || !mapRef.current) return;
+
+                    // Inicializa o mapa apenas uma vez
+                    if (!mapInstance.current) {
+                        mapInstance.current = L.map(mapRef.current).setView([-14.235, -51.925], 4); // Centro do Brasil
+                        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                        }).addTo(mapInstance.current);
+                    }
+                    
+                    // Limpa marcadores antigos
+                    mapInstance.current.eachLayer(layer => {
+                        if (layer instanceof L.CircleMarker) {
+                            mapInstance.current.removeLayer(layer);
+                        }
+                    });
+
+                    if (dadosPorCidade.length === 0) return;
+
+                    // Adiciona os novos marcadores (círculos)
+                    dadosPorCidade.forEach(cidade => {
+                        const getColor = (preco) => {
+                            if (preco > 6.0) return 'red';
+                            if (preco > 5.5) return 'orange';
+                            return 'green';
+                        };
+
+                        const circle = L.circleMarker([cidade.lat, cidade.lon], {
+                            radius: 5 + Math.log(cidade.volumeTotal), // Raio baseado no volume
+                            fillColor: getColor(cidade.precoMedio),
+                            color: '#000',
+                            weight: 1,
+                            opacity: 1,
+                            fillOpacity: 0.7
+                        }).addTo(mapInstance.current);
+                        
+                        circle.bindPopup(`<b>${cidade.cidade}</b><br>Preço Médio: R$ ${cidade.precoMedio.toFixed(3)}<br>Volume Total: ${cidade.volumeTotal.toFixed(2)} L`);
+                    });
+
+                }, [isLoading, dadosPorCidade]);
+
+                return React.createElement('div', { className: 'bg-white p-6 rounded-xl shadow-lg' },
+                    React.createElement('h2', { className: "text-2xl font-bold text-gray-800 mb-2 text-center" }, "Mapa de Calor de Custos"),
+                    React.createElement('p', { className: 'text-center text-gray-500 mb-6' }, 'Visualize o preço médio do combustível por cidade. O tamanho do círculo representa o volume total.'),
+                    isLoading ? React.createElement('p', null, 'Analisando e buscando coordenadas das cidades...') :
+                    React.createElement('div', { ref: mapRef, style: { height: '600px', width: '100%', borderRadius: '8px' } })
                 );
             }
             function Dashboard({ user, showToast, setCurrentPage }) {
@@ -3015,12 +3129,12 @@ function ShellAbastecimentos({ user, showToast }) {
                 const [currentPage, setCurrentPage] = React.useState('dashboard');
                 const [toast, setToast] = React.useState({ show: false, message: '', type: '' });
                 const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
-                const [openMenu, setOpenMenu] = React.useState('dashboard'); // <-- Alterado para abrir o dashboard por padrão
+                const [openMenu, setOpenMenu] = React.useState('dashboard');
                 const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(false);
                 
-                const ctaIconUrl = 'https://ikypygpbdmoxozfmwewr.supabase.co/storage/v1/object/sign/ICONS/CTAICON.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9lMGJiMDk5Zi1jZmE5LTQ5Y2UtYjUwNy0wZmE2ZWZkYWYxOTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJJQ09OUy9DVEFJQ09OLnBuZyIsImlhdCI6MTc1OTg2NTA1OSwiZXhwIjoyMDc1MjI1MDU5fQ.xnv-1nyrxg9XsQxLr7uoUQs2rpgzBeSfWXoX8Y37Y-U';
-                const ticketIconUrl = 'https://ikypygpbdmoxozfmwewr.supabase.co/storage/v1/object/sign/ICONS/TICKET.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9lMGJiMDk5Zi1jZmE5LTQ5Y2UtYjUwNy0wZmE2ZWZkYWYxOTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJJQ09OUy9USUNLRVQucG5nIiwiaWF0IjoxNzU5ODY1MTkzLCJleHAiOjIwNzUyMjUxOTN9.EUaHSgL2RjDC8Dt2XWtibSNhh6NtPy8G-3kFQHDpvQY';
-                const shellIconUrl = 'https://ikypygpbdmoxozfmwewr.supabase.co/storage/v1/object/sign/ICONS/Shell-958x575-1-Photoroom-Photoroom.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9lMGJiMDk5Zi1jZmE5LTQ5Y2UtYjUwNy0wZmE2ZWZkYWYxOTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJJQ09OUy9TaGVsbC05NTh4NTc1LTEtUGhvdG9yb29tLVBob3Rvcm9vbS5wbmciLCJpYXQiOjE3NTk4NjUyMTAsImV4cCI6MjA3NTIyNTIxMH0.gw9lTQcpcCYLyYgXGP2BsZcT8Hg2o7eCyNO_b8fqM0';
+                const ctaIconUrl = 'https://ikypygpbdmoxozfmwewr.supabase.co/storage/v1/object/public/ICONS/CTAICON.png';
+                const ticketIconUrl = 'https://ikypygpbdmoxozfmwewr.supabase.co/storage/v1/object/public/ICONS/TICKET.png';
+                const shellIconUrl = 'https://ikypygpbdmoxozfmwewr.supabase.co/storage/v1/object/public/ICONS/Shell-958x575-1-Photoroom-Photoroom.png';
 
                 const handleLogin = (userData) => {
                     localStorage.setItem('userSession', JSON.stringify(userData));
@@ -3056,8 +3170,11 @@ function ShellAbastecimentos({ user, showToast }) {
                         case 'shellAbastecimentos': return React.createElement(ShellAbastecimentos, { user, showToast });
                         case 'afericoes': return React.createElement(Afericoes, { user, showToast });
                         case 'alertas': return React.createElement(Alertas, { user, showToast });
+                        
                         case 'analiseCustos': return React.createElement(AnaliseCustos, { user, showToast });
                         case 'analiseEquipamentos': return React.createElement(AnaliseEquipamentos, { user, showToast });
+                        case 'analiseGeografica': return React.createElement(AnaliseGeografica, { user, showToast });
+
                         case 'cadastroFiliais': return user.nivel_permissao === 'administrador' ? React.createElement(CadastroFiliais, { user, showToast }) : null;
                         case 'mapeamentoCombustivel': return user.nivel_permissao === 'administrador' ? React.createElement(MapeamentoCombustivel, { user, showToast }) : null;
                         case 'cadastroAlertas': return user.nivel_permissao === 'administrador' ? React.createElement(CadastroAlertas, { user, showToast }) : null;
@@ -3137,7 +3254,7 @@ function ShellAbastecimentos({ user, showToast }) {
                         React.createElement('aside', { className: `fixed inset-y-0 left-0 bg-gray-800 text-white p-4 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:relative md:translate-x-0 transition-all duration-300 z-30 flex flex-col ${isSidebarCollapsed ? 'w-24' : 'w-72'}` },
                             React.createElement('div', { className: "flex items-center justify-center mb-8" },
                                 React.createElement('img', { 
-                                    src: "https://ikypygpbdmoxozfmwewr.supabase.co/storage/v1/object/sign/logo/LOGO_TERSYS-removebg-preview%20(1)%20(1).png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9lMGJiMDk5Zi1jZmE5LTQ5Y2UtYjUwNy0wZmE2ZWZkYWYxOTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJsb2dvL0xPR09fVEVSU1lTLXJlbW92ZWJnLXByZXZpZXcgKDEpICgxKS5wbmciLCJpYXQiOjE3NTkyMzU4NTYsImV4cCI6MjA3NDU5NTg1Nn0.R8XPKzBUjrjR3kcJijIvDaCGpGMlvyMKA6lsqiSOcEQ", 
+                                    src: "https://ikypygpbdmoxozfmwewr.supabase.co/storage/v1/object/public/logo/LOGO_TERSYS-removebg-preview%20(1)%20(1).png", 
                                     alt: "Logo", 
                                     className: `cursor-pointer transition-all duration-300 ${isSidebarCollapsed ? 'h-12 w-auto' : 'h-16 w-auto'}`,
                                     onClick: () => setCurrentPage('dashboard') 
@@ -3147,8 +3264,9 @@ function ShellAbastecimentos({ user, showToast }) {
                                 React.createElement('ul', { className: "space-y-2" },
                                     React.createElement(MenuCategory, { title: "Dashboard", icon: "LayoutDashboard", menuKey: "dashboard" },
                                         React.createElement(MenuItem, { page: 'dashboard', icon: 'FileText', text: 'Controle de Alertas' }),
-                                        React.createElement(MenuItem, { page: 'analiseCustos', icon: 'Beaker', text: 'Análise de Custos' }),
-                                        React.createElement(MenuItem, { page: 'analiseEquipamentos', icon: 'Ship', text: 'Consumo por Equipamento' })
+                                        React.createElement(MenuItem, { page: 'analiseCustos', icon: 'Beaker', text: 'Análise Comparativa' }),
+                                        React.createElement(MenuItem, { page: 'analiseEquipamentos', icon: 'Ship', text: 'Consumo por Equipamento' }),
+                                        React.createElement(MenuItem, { page: 'analiseGeografica', icon: 'Tank', text: 'Mapa de Custos' })
                                     ),
                                     React.createElement(MenuCategory, { title: "Importação", icon: "PlusCircle", menuKey: "importacao" },
                                         React.createElement(MenuItem, { page: 'ticketAbastecimentos', icon: ticketIconUrl, text: 'Ticket' }),
