@@ -276,12 +276,10 @@
                 );
             }
 
-            function Alertas({ user, showToast }) {
+            function Alertas({ user, showToast, onViewPlaca }) {
                 const [alertas, setAlertas] = React.useState([]);
                 const [prioridades, setPrioridades] = React.useState(new Map());
                 const [isLoading, setIsLoading] = React.useState(true);
-                
-                // --- Estados para Filtros e Interatividade ---
                 const [filterStatus, setFilterStatus] = React.useState('pendente');
                 const [searchTerm, setSearchTerm] = React.useState('');
                 const [selectedPeriods, setSelectedPeriods] = React.useState([]);
@@ -294,7 +292,6 @@
                 const [bulkObservacao, setBulkObservacao] = React.useState('');
                 const [filterPrioridade, setFilterPrioridade] = React.useState('todas');
 
-                // --- COMPONENTE: Seletor de Múltiplos Períodos ---
                 const MultiPeriodoPicker = ({ allPeriods, selectedPeriods, onChange }) => {
                     const [isOpen, setIsOpen] = React.useState(false);
                     const ref = React.useRef(null);
@@ -478,7 +475,10 @@
                                 React.createElement('p', { className: "text-sm text-gray-500" }, `Período: ${alerta.periodo || 'N/A'}`),
                                 React.createElement('span', { className: `text-xs font-semibold px-2 py-1 rounded-full ${alertaPrioridade.cor}` }, alertaPrioridade.prioridade)
                             ),
-                            React.createElement('p', { className: "text-lg font-bold text-gray-800 mt-1" }, `${labelPrincipal}: ${alerta.placa || 'N/A'}`),
+                            React.createElement('p', { 
+                                className: `text-lg font-bold text-gray-800 mt-1 ${labelPrincipal === 'Placa' ? 'cursor-pointer hover:text-blue-600' : ''}`,
+                                onClick: labelPrincipal === 'Placa' ? () => onViewPlaca(alerta.placa) : null
+                            }, `${labelPrincipal}: ${alerta.placa || 'N/A'}`),
                             React.createElement('p', { className: "text-sm text-gray-600 mt-1" }, `Alerta: ${alerta.tipo_alerta}`),
                             alerta.detalhes && React.createElement('p', { className: "text-sm text-red-600 font-semibold mt-1" }, `Detalhe: ${alerta.detalhes}`),
                             alerta.status === 'concluido' && React.createElement('p', { className: 'text-xs text-gray-500 mt-1 italic' }, `Concluído por ${alerta.usuario_conclusao} com a obs: "${alerta.observacao}"`),
@@ -571,6 +571,124 @@
                     filteredAlerts.length === 0 ? React.createElement('p', { className: 'text-center text-gray-500 py-8' }, 'Nenhum alerta encontrado para os filtros aplicados.') :
                     React.createElement('div', { className: 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4' }, 
                         filteredAlerts.map(alerta => React.createElement(AlertCard, { key: alerta.id, alerta: alerta }))
+                    )
+                );
+            }
+            function PerfilVeiculo({ user, showToast, placa, onBack }) {
+                const [veiculo, setVeiculo] = React.useState(null);
+                const [abastecimentos, setAbastecimentos] = React.useState([]);
+                const [alertas, setAlertas] = React.useState([]);
+                const [isLoading, setIsLoading] = React.useState(true);
+
+                const ChartComponent = ({ chartId, type, data, options }) => {
+                    const canvasRef = React.useRef(null);
+                    React.useEffect(() => {
+                        if (!canvasRef.current || !data) return;
+                        const chart = new Chart(canvasRef.current, { type, data, options });
+                        return () => chart.destroy();
+                    }, [data, type, options]);
+                    return React.createElement('canvas', { ref: canvasRef, id: chartId });
+                };
+
+                React.useEffect(() => {
+                    const fetchData = async () => {
+                        if (!placa) return;
+                        setIsLoading(true);
+                        try {
+                            const [eqRes, ticketRes, shellRes, ctaRes, alertasRes] = await Promise.all([
+                                supabaseProjeto2.from('equipamentos').select('type, brand, model').eq('plate', placa).single(),
+                                supabase.from('ticket_abastecimentos').select('*').eq('placa', placa).order('data_transacao', { ascending: false }),
+                                supabase.from('shell_abastecimentos').select('*').eq('placa', placa).order('data_hora_transacao', { ascending: false }),
+                                supabase.from('cta_abastecimentos').select('*').eq('placa', placa).order('data_hora_inicio', { ascending: false }),
+                                supabase.from('alertas').select('*').eq('placa', placa).order('data_criacao', { ascending: false })
+                            ]);
+
+                            if (eqError) console.error("Erro ao buscar detalhes do equipamento:", eqError);
+                            setVeiculo(eqRes.data || { type: 'N/A', brand: 'N/A', model: 'N/A' });
+
+                            const todosAbastecimentos = [
+                                ...(ticketRes.data || []),
+                                ...(shellRes.data || []),
+                                ...(ctaRes.data || [])
+                            ].sort((a, b) => new Date(b.data_transacao || b.data_hora_transacao || b.data_hora_inicio) - new Date(a.data_transacao || a.data_hora_transacao || a.data_hora_inicio));
+                            setAbastecimentos(todosAbastecimentos);
+
+                            setAlertas(alertasRes.data || []);
+
+                        } catch (err) {
+                            showToast("Erro ao carregar perfil do veículo.", "error");
+                        }
+                        setIsLoading(false);
+                    };
+                    fetchData();
+                }, [placa, showToast]);
+
+                const stats = React.useMemo(() => {
+                    const custoTotal = abastecimentos.reduce((sum, a) => sum + (a.valor_emissao || a.total_abastecimento || a.custo_total || 0), 0);
+                    const volumeTotal = abastecimentos.reduce((sum, a) => sum + (a.litros || a.volume || 0), 0);
+                    return {
+                        custoTotal: `R$ ${custoTotal.toFixed(2)}`,
+                        volumeTotal: `${volumeTotal.toFixed(2)} L`,
+                        precoMedio: `R$ ${(custoTotal / volumeTotal || 0).toFixed(3)} /L`,
+                        totalAbastecimentos: abastecimentos.length,
+                    };
+                }, [abastecimentos]);
+                
+                const chartData = React.useMemo(() => {
+                    const ultimosAbastecimentos = abastecimentos.slice(0, 12).reverse(); // Pega os últimos 12 e inverte para ordem cronológica
+                    return {
+                        labels: ultimosAbastecimentos.map(a => new Date(a.data_transacao || a.data_hora_transacao || a.data_hora_inicio).toLocaleDateString('pt-BR')),
+                        datasets: [{
+                            label: 'Custo Total (R$)',
+                            data: ultimosAbastecimentos.map(a => (a.valor_emissao || a.total_abastecimento || a.custo_total || 0)),
+                            borderColor: 'rgb(59, 130, 246)',
+                            backgroundColor: 'rgba(59, 130, 246, 0.5)',
+                            yAxisID: 'yCusto',
+                            tension: 0.1
+                        }, {
+                            label: 'Volume (L)',
+                            data: ultimosAbastecimentos.map(a => (a.litros || a.volume || 0)),
+                            borderColor: 'rgb(234, 179, 8)',
+                            backgroundColor: 'rgba(234, 179, 8, 0.5)',
+                            yAxisID: 'yVolume',
+                            tension: 0.1
+                        }]
+                    };
+                }, [abastecimentos]);
+
+                if (isLoading) return React.createElement('p', null, 'Carregando perfil do veículo...');
+
+                return React.createElement('div', null,
+                    React.createElement('button', { onClick: onBack, className: 'flex items-center gap-2 text-sm font-semibold text-blue-600 mb-6 hover:underline' }, React.createElement(LucideIcon, { name: 'ChevronsLeft' }), 'Voltar para Análise'),
+                    React.createElement('div', { className: 'bg-white p-6 rounded-xl shadow-lg' },
+                        React.createElement('h2', { className: "text-3xl font-bold text-gray-800" }, `Perfil do Veículo: ${placa}`),
+                        React.createElement('p', { className: 'text-gray-500' }, `${veiculo.type} ${veiculo.brand} ${veiculo.model}`),
+                        
+                        React.createElement('div', { className: 'grid grid-cols-2 md:grid-cols-4 gap-4 my-6' },
+                            React.createElement('div', { className: 'bg-gray-50 p-4 rounded-lg text-center' }, React.createElement('p', { className: 'text-sm' }, 'Custo Total'), React.createElement('p', { className: 'font-bold text-xl' }, stats.custoTotal)),
+                            React.createElement('div', { className: 'bg-gray-50 p-4 rounded-lg text-center' }, React.createElement('p', { className: 'text-sm' }, 'Volume Total'), React.createElement('p', { className: 'font-bold text-xl' }, stats.volumeTotal)),
+                            React.createElement('div', { className: 'bg-gray-50 p-4 rounded-lg text-center' }, React.createElement('p', { className: 'text-sm' }, 'Preço Médio'), React.createElement('p', { className: 'font-bold text-xl' }, stats.precoMedio)),
+                            React.createElement('div', { className: 'bg-gray-50 p-4 rounded-lg text-center' }, React.createElement('p', { className: 'text-sm' }, 'Nº de Abastecimentos'), React.createElement('p', { className: 'font-bold text-xl' }, stats.totalAbastecimentos))
+                        ),
+
+                        React.createElement('div', { className: 'grid grid-cols-1 lg:grid-cols-2 gap-6' },
+                            React.createElement('div', null, 
+                                React.createElement('h3', { className: 'font-semibold mb-2' }, 'Histórico de Consumo (Últimos 12)'),
+                                React.createElement('div', { className: 'h-80 bg-gray-50 p-2 rounded-lg' },
+                                    React.createElement(ChartComponent, { chartId: 'perfilConsumo', type: 'line', data: chartData, options: { maintainAspectRatio: false, responsive: true, scales: { yCusto: { type: 'linear', display: true, position: 'left' }, yVolume: { type: 'linear', display: true, position: 'right', grid: { drawOnChartArea: false } } } } })
+                                )
+                            ),
+                            React.createElement('div', null,
+                                React.createElement('h3', { className: 'font-semibold mb-2' }, 'Histórico de Alertas'),
+                                React.createElement('div', { className: 'space-y-2 max-h-80 overflow-y-auto bg-gray-50 p-2 rounded-lg' },
+                                    alertas.length === 0 ? React.createElement('p', {className: 'p-4 text-sm text-center'}, 'Nenhum alerta para este veículo.') :
+                                    alertas.map(alerta => React.createElement('div', { key: alerta.id, className: `p-2 rounded text-sm ${alerta.status === 'pendente' ? 'bg-yellow-100 border-l-4 border-yellow-500' : 'bg-green-100'}` }, 
+                                        React.createElement('p', {className: 'font-semibold'}, alerta.tipo_alerta),
+                                        React.createElement('p', {className: 'text-xs'}, `Período: ${alerta.periodo} - Status: ${alerta.status}`)
+                                    ))
+                                )
+                            )
+                        )
                     )
                 );
             }
@@ -856,7 +974,7 @@
                     )
                 );
             }
-            function AnaliseEquipamentos({ user, showToast }) {
+            function AnaliseEquipamentos({ user, showToast, onViewPlaca }) {
                 const [dados, setDados] = React.useState(null);
                 const [isLoading, setIsLoading] = React.useState(true);
 
@@ -874,7 +992,6 @@
                     const fetchData = async () => {
                         setIsLoading(true);
                         try {
-                            // 1. Busca todos os abastecimentos
                             const [ticketRes, shellRes, ctaRes] = await Promise.all([
                                 supabase.from('ticket_abastecimentos').select('placa, litros'),
                                 supabase.from('shell_abastecimentos').select('placa, litros'),
@@ -886,25 +1003,30 @@
                             const todosAbastecimentos = [
                                 ...(ticketRes.data || []),
                                 ...(shellRes.data || []),
-                                ...(ctaRes.data.map(a => ({...a, litros: a.volume}))) // Renomeia 'volume' para 'litros'
+                                ...(ctaRes.data.map(a => ({...a, litros: a.volume})))
                             ];
 
                             const placasUnicas = [...new Set(todosAbastecimentos.map(a => a.placa).filter(Boolean))];
 
-                            // 2. Busca os tipos de equipamento na base externa
                             const { data: equipamentos, error: eqError } = await supabaseProjeto2.from('equipamentos').select('plate, type').in('plate', placasUnicas);
                             if (eqError) throw eqError;
 
                             const tipoPorPlaca = new Map(equipamentos.map(eq => [eq.plate, eq.type || 'Não Categorizado']));
 
-                            // 3. Agrupa o consumo por tipo de equipamento
                             const consumoPorTipo = todosAbastecimentos.reduce((acc, abs) => {
+                                if (!abs.placa) return acc;
                                 const tipo = tipoPorPlaca.get(abs.placa) || 'Não Categorizado';
-                                acc[tipo] = (acc[tipo] || 0) + (abs.litros || 0);
+                                if (!acc[tipo]) {
+                                    acc[tipo] = { volume: 0, placas: new Set() };
+                                }
+                                acc[tipo].volume += (abs.litros || 0);
+                                acc[tipo].placas.add(abs.placa);
                                 return acc;
                             }, {});
 
-                            const sortedData = Object.entries(consumoPorTipo).sort(([,a],[,b]) => b-a);
+                            const sortedData = Object.entries(consumoPorTipo)
+                                .map(([tipo, data]) => ([tipo, data.volume, Array.from(data.placas)]))
+                                .sort(([,a],[,b]) => b-a);
                             
                             const chartData = {
                                 labels: sortedData.map(([tipo]) => tipo),
@@ -942,14 +1064,23 @@
                                 React.createElement('thead', { className: 'text-xs text-gray-700 uppercase bg-gray-100' },
                                     React.createElement('tr', null, 
                                         React.createElement('th', { className: 'px-6 py-3' }, 'Tipo de Equipamento'),
-                                        React.createElement('th', { className: 'px-6 py-3' }, 'Volume Total (L)')
+                                        React.createElement('th', { className: 'px-6 py-3' }, 'Volume Total (L)'),
+                                        React.createElement('th', { className: 'px-6 py-3' }, 'Placas Envolvidas')
                                     )
                                 ),
                                 React.createElement('tbody', null,
-                                    dados.tableData.map(([tipo, volume]) => 
+                                    dados.tableData.map(([tipo, volume, placas]) => 
                                         React.createElement('tr', { key: tipo, className: 'bg-white border-b' },
                                             React.createElement('td', { className: 'px-6 py-4 font-medium text-gray-900' }, tipo),
-                                            React.createElement('td', { className: 'px-6 py-4' }, volume.toFixed(2))
+                                            React.createElement('td', { className: 'px-6 py-4' }, volume.toFixed(2)),
+                                            React.createElement('td', { className: 'px-6 py-4' },
+                                                placas.slice(0, 5).map(placa => React.createElement('span', {
+                                                    key: placa,
+                                                    onClick: () => onViewPlaca(placa),
+                                                    className: 'inline-block bg-gray-200 rounded-full px-3 py-1 text-xs font-semibold text-gray-700 mr-2 mb-2 cursor-pointer hover:bg-blue-200'
+                                                }, placa)),
+                                                placas.length > 5 && React.createElement('span', {className: 'text-xs text-gray-500'}, ` +${placas.length - 5} outras`)
+                                            )
                                         )
                                     )
                                 )
@@ -1174,199 +1305,7 @@
                     )
                 );
             }
-            function App() {
-                const [user, setUser] = React.useState(() => {
-                    const savedUser = localStorage.getItem('userSession');
-                    return savedUser ? JSON.parse(savedUser) : null;
-                });
-                const [currentPage, setCurrentPage] = React.useState('dashboard');
-                const [toast, setToast] = React.useState({ show: false, message: '', type: '' });
-                const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
-                const [openMenu, setOpenMenu] = React.useState('dashboard');
-                const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(false);
-                
-                const ctaIconUrl = 'https://ikypygpbdmoxozfmwewr.supabase.co/storage/v1/object/public/ICONS/CTAICON.png';
-                const ticketIconUrl = 'https://ikypygpbdmoxozfmwewr.supabase.co/storage/v1/object/public/ICONS/TICKET.png';
-                const shellIconUrl = 'https://ikypygpbdmoxozfmwewr.supabase.co/storage/v1/object/public/ICONS/Shell-958x575-1-Photoroom-Photoroom.png';
-
-                const handleLogin = (userData) => {
-                    localStorage.setItem('userSession', JSON.stringify(userData));
-                    setUser(userData);
-                    setCurrentPage('dashboard');
-                };
-                const handleLogout = () => {
-                    localStorage.removeItem('userSession');
-                    setUser(null);
-                };
-                const showToast = (message, type = 'success') => setToast({ show: true, message, type });
-                const closeToast = () => setToast({ show: false, message: '', type: '' });
-                const toggleMenu = (menu) => {
-                    if (isSidebarCollapsed) {
-                        setIsSidebarCollapsed(false);
-                    } else {
-                        setOpenMenu(openMenu === menu ? '' : menu);
-                    }
-                };
-                const toggleSidebarCollapse = () => {
-                    setIsSidebarCollapsed(!isSidebarCollapsed);
-                    if (!isSidebarCollapsed) {
-                        setOpenMenu('');
-                    }
-                };
-                
-                const renderPage = () => {
-                    switch (currentPage) {
-                        case 'dashboard': return React.createElement(Dashboard, { user, showToast, setCurrentPage: setCurrentPage });
-                        case 'ticketAbastecimentos': return React.createElement(TicketAbastecimentos, { user, showToast });
-                        case 'ctaAbastecimentos': return React.createElement(CtaAbastecimentos, { user, showToast });
-                        case 'ctaCarregamentos': return React.createElement(CtaCarregamentos, { user, showToast });
-                        case 'shellAbastecimentos': return React.createElement(ShellAbastecimentos, { user, showToast });
-                        case 'afericoes': return React.createElement(Afericoes, { user, showToast });
-                        case 'alertas': return React.createElement(Alertas, { user, showToast });
-                        
-                        case 'analiseCustos': return React.createElement(AnaliseCustos, { user, showToast });
-                        case 'analiseEquipamentos': return React.createElement(AnaliseEquipamentos, { user, showToast });
-
-                        case 'cadastroFiliais': return user.nivel_permissao === 'administrador' ? React.createElement(CadastroFiliais, { user, showToast }) : null;
-                        case 'mapeamentoCombustivel': return user.nivel_permissao === 'administrador' ? React.createElement(MapeamentoCombustivel, { user, showToast }) : null;
-                        case 'cadastroAlertas': return user.nivel_permissao === 'administrador' ? React.createElement(CadastroAlertas, { user, showToast }) : null;
-                        case 'userManagement': return React.createElement(UserManagement, { user, showToast });
-                        default: return React.createElement(Dashboard, { user, showToast, setCurrentPage: setCurrentPage });
-                    }
-                };
-
-                if (!user) {
-                    return React.createElement(LoginPage, { onLogin: handleLogin });
-                }
-
-                const MenuItem = ({ page, icon, text }) => {
-                   const isActive = currentPage === page;
-                   let iconElement;
-                   
-                   if (typeof icon === 'string' && icon.startsWith('http')) {
-                       iconElement = React.createElement('img', {
-                           src: icon,
-                           alt: text,
-                           className: `h-5 w-5 flex-shrink-0 object-contain ${!isSidebarCollapsed && 'mr-3'}`
-                       });
-                   } else {
-                       iconElement = React.createElement(LucideIcon, {
-                           name: icon,
-                           className: `h-5 w-5 flex-shrink-0 ${!isSidebarCollapsed && 'mr-3'}`
-                       });
-                   }
-
-                   return React.createElement('li', null,
-                       React.createElement('button', {
-                           onClick: () => { setCurrentPage(page); setIsSidebarOpen(false); },
-                           className: `flex items-center w-full px-4 py-2 rounded-lg transition-colors ${isSidebarCollapsed ? 'justify-center' : ''} ${isActive ? 'bg-blue-600 text-white' : 'hover:bg-gray-700 text-gray-300'}`
-                       },
-                           iconElement,
-                           !isSidebarCollapsed && React.createElement('span', {className: 'truncate'}, text)
-                       )
-                    );
-                };
-                
-                const MenuCategory = ({ title, icon, children, menuKey }) => {
-                    const isOpen = openMenu === menuKey;
-                    let iconElement;
-
-                    if (typeof icon === 'string' && icon.startsWith('http')) {
-                         iconElement = React.createElement('img', {
-                             src: icon,
-                             alt: title,
-                             className: `h-5 w-5 flex-shrink-0 object-contain ${!isSidebarCollapsed && 'mr-3'}`
-                         });
-                    } else {
-                         iconElement = React.createElement(LucideIcon, {
-                             name: icon,
-                             className: `h-5 w-5 flex-shrink-0 ${!isSidebarCollapsed && 'mr-3'}`
-                         });
-                    }
-
-                    return (
-                        React.createElement('li', { className: "mb-2" },
-                            React.createElement('button', {
-                                onClick: () => toggleMenu(menuKey),
-                                className: `flex items-center w-full px-4 py-2 rounded-lg transition-colors ${isSidebarCollapsed ? 'justify-center' : ''} ${!isSidebarCollapsed ? 'justify-between' : ''} ${isOpen && !isSidebarCollapsed ? 'bg-gray-700' : 'hover:bg-gray-700'} text-gray-200`
-                            },
-                                React.createElement('span', {className: 'flex items-center truncate'},
-                                    iconElement,
-                                    !isSidebarCollapsed && React.createElement('span', {className: 'truncate'}, title)
-                                ),
-                                !isSidebarCollapsed && React.createElement(LucideIcon, { name: isOpen ? "ChevronUp" : "ChevronDown", className: "h-5 w-5 flex-shrink-0" })
-                            ),
-                            !isSidebarCollapsed && isOpen && React.createElement('ul', { className: "ml-4 mt-2 space-y-2 border-l border-gray-700 pl-4" }, children)
-                        )
-                    );
-                };
-
-                return (
-                    React.createElement('div', { className: "flex min-h-screen bg-gray-100" },
-                        React.createElement('aside', { className: `fixed inset-y-0 left-0 bg-gray-800 text-white p-4 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:relative md:translate-x-0 transition-all duration-300 z-30 flex flex-col ${isSidebarCollapsed ? 'w-24' : 'w-72'}` },
-                            React.createElement('div', { className: "flex items-center justify-center mb-8" },
-                                React.createElement('img', { 
-                                    src: "https://ikypygpbdmoxozfmwewr.supabase.co/storage/v1/object/public/logo/LOGO_TERSYS-removebg-preview%20(1)%20(1).png", 
-                                    alt: "Logo", 
-                                    className: `cursor-pointer transition-all duration-300 ${isSidebarCollapsed ? 'h-12 w-auto' : 'h-16 w-auto'}`,
-                                    onClick: () => setCurrentPage('dashboard') 
-                                })
-                            ),
-                            React.createElement('nav', { className: "flex-grow" },
-                                React.createElement('ul', { className: "space-y-2" },
-                                    React.createElement(MenuCategory, { title: "Dashboard", icon: "LayoutDashboard", menuKey: "dashboard" },
-                                        React.createElement(MenuItem, { page: 'dashboard', icon: 'FileText', text: 'Controle de Alertas' }),
-                                        React.createElement(MenuItem, { page: 'analiseCustos', icon: 'Beaker', text: 'Análise Comparativa' }), // <-- NOME ATUALIZADO
-                                        React.createElement(MenuItem, { page: 'analiseEquipamentos', icon: 'Ship', text: 'Consumo por Equipamento' })
-                                    ),
-                                    React.createElement(MenuCategory, { title: "Importação", icon: "PlusCircle", menuKey: "importacao" },
-                                        React.createElement(MenuItem, { page: 'ticketAbastecimentos', icon: ticketIconUrl, text: 'Ticket' }),
-                                        React.createElement(MenuItem, { page: 'ctaAbastecimentos', icon: ctaIconUrl, text: 'CTA - Abastecimentos' }),
-                                        React.createElement(MenuItem, { page: 'ctaCarregamentos', icon: ctaIconUrl, text: 'CTA - Carregamentos' }),
-                                        React.createElement(MenuItem, { page: 'shellAbastecimentos', icon: shellIconUrl, text: 'Shell' })
-                                    ),
-                                    React.createElement(MenuCategory, { title: "Operacional", icon: "Settings", menuKey: "operacional" },
-                                        React.createElement(MenuItem, { page: 'alertas', icon: 'FileText', text: 'Painel de Alertas' }),
-                                        React.createElement(MenuItem, { page: 'afericoes', icon: 'Tank', text: 'Aferições e Perdas' })
-                                    ),
-                                    user.nivel_permissao === 'administrador' && React.createElement(MenuCategory, { title: "Cadastros", icon: "FileText", menuKey: "cadastros" },
-                                        React.createElement(MenuItem, { page: 'cadastroFiliais', icon: 'Building', text: 'Filiais (DE/PARA)' }),
-                                        React.createElement(MenuItem, { page: 'mapeamentoCombustivel', icon: 'Fuel', text: 'DE/PARA Combustível' }),
-                                        React.createElement(MenuItem, { page: 'cadastroAlertas', icon: 'Settings', text: 'Tipos de Alerta' }),
-                                        React.createElement(MenuItem, { page: 'userManagement', icon: 'Users', text: 'Usuários' })
-                                    )
-                                )
-                            ),
-                            React.createElement('div', {className: 'mt-auto pt-4 border-t border-gray-700'},
-                                React.createElement('button', { 
-                                    onClick: toggleSidebarCollapse, 
-                                    className: "w-full flex items-center p-3 rounded-lg text-gray-400 hover:bg-gray-700 justify-center mb-2" 
-                                },
-                                    React.createElement(LucideIcon, { name: isSidebarCollapsed ? "ChevronsRight" : "ChevronsLeft", className: "w-6 h-6" })
-                                ),
-                                React.createElement('button', { 
-                                    onClick: handleLogout, 
-                                    className: `w-full flex items-center p-3 rounded-lg text-red-400 hover:bg-gray-700 ${isSidebarCollapsed ? 'justify-center' : ''}` 
-                                },
-                                    React.createElement(LucideIcon, { name: "LogOut", className: `w-6 h-6 ${!isSidebarCollapsed && 'mr-3'}` }),
-                                    !isSidebarCollapsed && 'Sair'
-                                )
-                            )
-                        ),
-                        React.createElement('main', { className: "flex-1 p-4 md:p-8 flex flex-col" },
-                            React.createElement('header', { className: "w-full bg-white p-4 rounded-xl shadow-lg mb-8 flex justify-between items-center" },
-                                React.createElement('button', { className: "md:hidden text-gray-700 p-2", onClick: () => setIsSidebarOpen(true) }, React.createElement(LucideIcon, { name: "Menu" })),
-                                React.createElement('div', { className: "text-right text-sm text-gray-600" },
-                                    React.createElement('p', null, "Usuário: ", React.createElement('strong', null, user.nome)),
-                                    React.createElement('p', {className: "capitalize"}, "Permissão: ", React.createElement('strong', null, user.nivel_permissao))
-                                )
-                            ),
-                            React.createElement('div', { className: "flex-grow" }, renderPage()),
-                            toast.show && React.createElement(Toast, { message: toast.message, type: toast.type, onClose: closeToast })
-                        )
-                    )
-                );
-            }
+            
             function MapeamentoCombustivel({ user, showToast }) {
                 const [regras, setRegras] = React.useState([]);
                 const [isLoading, setIsLoading] = React.useState(true);
@@ -3132,6 +3071,9 @@ function ShellAbastecimentos({ user, showToast }) {
                 const [openMenu, setOpenMenu] = React.useState('dashboard');
                 const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(false);
                 
+                // NOVO ESTADO PARA CONTROLAR A VISUALIZAÇÃO DE UMA PLACA ESPECÍFICA
+                const [viewingPlaca, setViewingPlaca] = React.useState(null);
+
                 const ctaIconUrl = 'https://ikypygpbdmoxozfmwewr.supabase.co/storage/v1/object/public/ICONS/CTAICON.png';
                 const ticketIconUrl = 'https://ikypygpbdmoxozfmwewr.supabase.co/storage/v1/object/public/ICONS/TICKET.png';
                 const shellIconUrl = 'https://ikypygpbdmoxozfmwewr.supabase.co/storage/v1/object/public/ICONS/Shell-958x575-1-Photoroom-Photoroom.png';
@@ -3147,6 +3089,16 @@ function ShellAbastecimentos({ user, showToast }) {
                 };
                 const showToast = (message, type = 'success') => setToast({ show: true, message, type });
                 const closeToast = () => setToast({ show: false, message: '', type: '' });
+                
+                const navigateTo = (page) => {
+                    setViewingPlaca(null);
+                    setCurrentPage(page);
+                };
+
+                const viewPlacaProfile = (placa) => {
+                    setViewingPlaca(placa);
+                };
+
                 const toggleMenu = (menu) => {
                     if (isSidebarCollapsed) {
                         setIsSidebarCollapsed(false);
@@ -3162,24 +3114,31 @@ function ShellAbastecimentos({ user, showToast }) {
                 };
                 
                 const renderPage = () => {
+                    if (viewingPlaca) {
+                        return React.createElement(PerfilVeiculo, { 
+                            user, 
+                            showToast, 
+                            placa: viewingPlaca, 
+                            onBack: () => setViewingPlaca(null) 
+                        });
+                    }
+
                     switch (currentPage) {
-                        case 'dashboard': return React.createElement(Dashboard, { user, showToast, setCurrentPage: setCurrentPage });
+                        case 'dashboard': return React.createElement(Dashboard, { user, showToast, setCurrentPage: navigateTo });
                         case 'ticketAbastecimentos': return React.createElement(TicketAbastecimentos, { user, showToast });
                         case 'ctaAbastecimentos': return React.createElement(CtaAbastecimentos, { user, showToast });
                         case 'ctaCarregamentos': return React.createElement(CtaCarregamentos, { user, showToast });
                         case 'shellAbastecimentos': return React.createElement(ShellAbastecimentos, { user, showToast });
                         case 'afericoes': return React.createElement(Afericoes, { user, showToast });
-                        case 'alertas': return React.createElement(Alertas, { user, showToast });
-                        
+                        case 'alertas': return React.createElement(Alertas, { user, showToast, onViewPlaca: viewPlacaProfile });
                         case 'analiseCustos': return React.createElement(AnaliseCustos, { user, showToast });
-                        case 'analiseEquipamentos': return React.createElement(AnaliseEquipamentos, { user, showToast });
+                        case 'analiseEquipamentos': return React.createElement(AnaliseEquipamentos, { user, showToast, onViewPlaca: viewPlacaProfile });
                         case 'analiseGeografica': return React.createElement(AnaliseGeografica, { user, showToast });
-
                         case 'cadastroFiliais': return user.nivel_permissao === 'administrador' ? React.createElement(CadastroFiliais, { user, showToast }) : null;
                         case 'mapeamentoCombustivel': return user.nivel_permissao === 'administrador' ? React.createElement(MapeamentoCombustivel, { user, showToast }) : null;
                         case 'cadastroAlertas': return user.nivel_permissao === 'administrador' ? React.createElement(CadastroAlertas, { user, showToast }) : null;
                         case 'userManagement': return React.createElement(UserManagement, { user, showToast });
-                        default: return React.createElement(Dashboard, { user, showToast, setCurrentPage: setCurrentPage });
+                        default: return React.createElement(Dashboard, { user, showToast, setCurrentPage: navigateTo });
                     }
                 };
 
@@ -3188,7 +3147,7 @@ function ShellAbastecimentos({ user, showToast }) {
                 }
 
                 const MenuItem = ({ page, icon, text }) => {
-                   const isActive = currentPage === page;
+                   const isActive = currentPage === page && !viewingPlaca;
                    let iconElement;
                    
                    if (typeof icon === 'string' && icon.startsWith('http')) {
@@ -3206,7 +3165,7 @@ function ShellAbastecimentos({ user, showToast }) {
 
                    return React.createElement('li', null,
                        React.createElement('button', {
-                           onClick: () => { setCurrentPage(page); setIsSidebarOpen(false); },
+                           onClick: () => { navigateTo(page); setIsSidebarOpen(false); },
                            className: `flex items-center w-full px-4 py-2 rounded-lg transition-colors ${isSidebarCollapsed ? 'justify-center' : ''} ${isActive ? 'bg-blue-600 text-white' : 'hover:bg-gray-700 text-gray-300'}`
                        },
                            iconElement,
@@ -3257,7 +3216,7 @@ function ShellAbastecimentos({ user, showToast }) {
                                     src: "https://ikypygpbdmoxozfmwewr.supabase.co/storage/v1/object/public/logo/LOGO_TERSYS-removebg-preview%20(1)%20(1).png", 
                                     alt: "Logo", 
                                     className: `cursor-pointer transition-all duration-300 ${isSidebarCollapsed ? 'h-12 w-auto' : 'h-16 w-auto'}`,
-                                    onClick: () => setCurrentPage('dashboard') 
+                                    onClick: () => navigateTo('dashboard') 
                                 })
                             ),
                             React.createElement('nav', { className: "flex-grow" },
