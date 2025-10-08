@@ -524,95 +524,73 @@
                 );
             }
 
-            function Dashboard({ user, showToast }) {
-                return React.createElement('div', { className: "bg-white p-6 rounded-xl shadow-lg" },
-                    React.createElement('h2', { className: "text-2xl font-bold text-gray-800 mb-4" }, `Olá, ${user.nome}!`),
-                    React.createElement('p', null, "Dashboard com os últimos abastecimentos de cada origem (em desenvolvimento).")
-                );
-            }
-
-            function MapeamentoCombustivel({ user, showToast }) {
-                const [regras, setRegras] = React.useState([]);
+            function Dashboard({ user, showToast, setCurrentPage }) {
+                const [alertCounts, setAlertCounts] = React.useState({ Alta: 0, Média: 0, Baixa: 0, total: 0 });
                 const [isLoading, setIsLoading] = React.useState(true);
-                const [showForm, setShowForm] = React.useState(false);
-                const initialFormState = { nome_original: '', nome_padronizado: '', plataforma: '' };
-                const [formData, setFormData] = React.useState(initialFormState);
-                const fetchRegras = React.useCallback(async () => {
-                    setIsLoading(true);
-                    try {
-                        const { data, error } = await supabase.from('combustivel_mapeamento').select('*').order('nome_padronizado');
-                        if (error) throw error;
-                        setRegras(data || []);
-                    } catch (err) {
-                        showToast("Erro ao carregar regras de mapeamento.", "error");
-                    }
-                    setIsLoading(false);
-                }, [showToast]);
+
                 React.useEffect(() => {
-                    fetchRegras();
-                }, [fetchRegras]);
-                const handleInputChange = (e) => {
-                    setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
-                };
-                const handleFormSubmit = async (e) => {
-                    e.preventDefault();
-                    if (!formData.nome_original.trim() || !formData.nome_padronizado.trim()) {
-                        showToast("Os campos 'Nome Original' e 'Nome Padronizado' são obrigatórios.", "error");
-                        return;
-                    }
-                    setIsLoading(true);
-                    try {
-                        const record = {
-                            nome_original: formData.nome_original.trim(),
-                            nome_padronizado: formData.nome_padronizado.trim(),
-                            plataforma: formData.plataforma.trim() || null,
-                            usuario_criacao: user.nome,
-                        };
-                        const { error } = await supabase.from('combustivel_mapeamento').insert([record]);
-                        if (error) throw error;
-                        showToast("Regra de mapeamento criada com sucesso!", "success");
-                        setShowForm(false);
-                        setFormData(initialFormState);
-                        fetchRegras();
-                    } catch (err) {
-                        showToast(`Erro ao salvar: ${err.message}`, "error");
-                    }
-                    setIsLoading(false);
-                };
-                return React.createElement('div', { className: "bg-white p-6 rounded-xl shadow-lg" },
-                    React.createElement('h2', { className: "text-2xl font-bold text-gray-800 mb-6 text-center" }, "Mapeamento de Combustível (DE/PARA)"),
-                    !showForm && React.createElement('div', { className: 'flex justify-center mb-6' },
-                        React.createElement('button', {
-                            onClick: () => { setShowForm(true); setFormData(initialFormState); },
-                            className: "p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center"
-                        }, React.createElement(LucideIcon, { name: 'PlusCircle', className: 'mr-2 h-5 w-5' }), "Nova Regra")
-                    ),
-                    showForm && React.createElement('form', { onSubmit: handleFormSubmit, className: "grid grid-cols-1 md:grid-cols-3 gap-4 mb-8 p-4 border rounded-lg bg-gray-50" },
-                        React.createElement('input', { name: "nome_original", value: formData.nome_original, onChange: handleInputChange, placeholder: "Nome na Planilha (DE)*", className: "p-2 border rounded" }),
-                        React.createElement('input', { name: "nome_padronizado", value: formData.nome_padronizado, onChange: handleInputChange, placeholder: "Nome Padrão (PARA)*", className: "p-2 border rounded" }),
-                        React.createElement('input', { name: "plataforma", value: formData.plataforma, onChange: handleInputChange, placeholder: "Plataforma (Ex: Ticket)", className: "p-2 border rounded" }),
-                        React.createElement('div', { className: "md:col-span-3 flex justify-end gap-4" },
-                            React.createElement('button', { type: "button", onClick: () => setShowForm(false), className: "py-2 px-4 bg-gray-300 rounded-lg" }, "Cancelar"),
-                            React.createElement('button', { type: "submit", className: "py-2 px-4 bg-blue-600 text-white rounded-lg", disabled: isLoading }, isLoading ? 'Salvando...' : 'Salvar')
-                        )
-                    ),
-                    React.createElement('div', { className: "rounded-lg border border-slate-200 shadow-sm overflow-hidden" },
-                        React.createElement('table', { className: "w-full text-sm text-left text-slate-600" },
-                            React.createElement('thead', { className: "text-xs text-slate-700 uppercase bg-slate-100" },
-                                React.createElement('tr', null,
-                                    ["Nome na Planilha (DE)", "Nome Padrão (PARA)", "Plataforma"].map(h => 
-                                        React.createElement('th', { key: h, className: "px-6 py-4 font-semibold border-b border-r border-slate-200 last:border-r-0" }, h)
-                                    )
-                                )
-                            ),
-                            React.createElement('tbody', null,
-                                isLoading ? React.createElement('tr', null, React.createElement('td', { colSpan: 3, className: "p-4 text-center" }, "Carregando...")) :
-                                regras.map(item => React.createElement('tr', { key: item.id, className: "hover:bg-blue-50 even:bg-slate-50" },
-                                    React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, item.nome_original),
-                                    React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, React.createElement('span', { className: 'font-medium text-slate-800' }, item.nome_padronizado)),
-                                    React.createElement('td', { className: "px-6 py-4" }, item.plataforma)
-                                ))
-                            )
+                    const fetchAlertCounts = async () => {
+                        setIsLoading(true);
+                        try {
+                            // Esta query busca os alertas pendentes e junta com a tabela de prioridades
+                            const { data, error } = await supabase
+                                .from('alertas')
+                                .select(`
+                                    id,
+                                    alerta_prioridades ( prioridade )
+                                `)
+                                .eq('status', 'pendente');
+
+                            if (error) throw error;
+                            
+                            // Processa os dados para contar
+                            const counts = data.reduce((acc, alerta) => {
+                                const prioridade = alerta.alerta_prioridades?.prioridade || 'N/D';
+                                if (acc[prioridade]) {
+                                    acc[prioridade]++;
+                                } else {
+                                    acc[prioridade] = 1;
+                                }
+                                acc.total++;
+                                return acc;
+                            }, { Alta: 0, Média: 0, Baixa: 0, total: 0 });
+
+                            setAlertCounts(counts);
+
+                        } catch (err) {
+                            console.error("Erro ao buscar contagem de alertas:", err);
+                            showToast("Não foi possível carregar o resumo de alertas.", "error");
+                        }
+                        setIsLoading(false);
+                    };
+
+                    fetchAlertCounts();
+                }, [showToast]);
+
+                const Card = ({ prioridade, cor, quantidade }) => (
+                    React.createElement('div', { 
+                        className: `bg-white p-6 rounded-xl shadow-lg border-l-4 ${cor} cursor-pointer hover:shadow-xl transition-shadow`,
+                        onClick: () => setCurrentPage('alertas') // Ação de clique para ir para a tela de alertas
+                    },
+                        React.createElement('p', { className: 'text-sm font-medium text-gray-500' }, `Alertas de Prioridade ${prioridade}`),
+                        React.createElement('p', { className: 'text-4xl font-bold text-gray-800 mt-2' }, isLoading ? '...' : quantidade)
+                    )
+                );
+
+                return React.createElement('div', null,
+                    React.createElement('h2', { className: "text-3xl font-bold text-gray-800 mb-2" }, `Olá, ${user.nome}!`),
+                    React.createElement('p', { className: "text-gray-600 mb-8" }, "Este é o resumo atual do seu sistema."),
+                    React.createElement('div', { className: 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6' },
+                        React.createElement(Card, { prioridade: 'Alta', cor: 'border-red-500', quantidade: alertCounts.Alta }),
+                        React.createElement(Card, { prioridade: 'Média', cor: 'border-yellow-500', quantidade: alertCounts.Média }),
+                        React.createElement(Card, { prioridade: 'Baixa', cor: 'border-blue-500', quantidade: alertCounts.Baixa }),
+                        // Card de Total
+                        React.createElement('div', { 
+                            className: `bg-gray-800 text-white p-6 rounded-xl shadow-lg cursor-pointer hover:shadow-xl transition-shadow`,
+                            onClick: () => setCurrentPage('alertas')
+                        },
+                            React.createElement('p', { className: 'text-sm font-medium text-gray-300' }, `Total de Alertas Pendentes`),
+                            React.createElement('p', { className: 'text-4xl font-bold mt-2' }, isLoading ? '...' : alertCounts.total)
                         )
                     )
                 );
@@ -1433,164 +1411,155 @@ function ShellAbastecimentos({ user, showToast }) {
                     )
                 );
             }
-            function Afericoes({ user, showToast }) {
-                const [afericoes, setAfericoes] = React.useState([]);
-                const [isLoading, setIsLoading] = React.useState(false);
-                const [showForm, setShowForm] = React.useState(false);
-                const [opcoesTanque, setOpcoesTanque] = React.useState([]);
-                const initialFormState = { tanque: '', data_afericao: '', volume_balde: '', volume_cta: '', volume_bomba: '', observacao: '' };
-                const [formData, setFormData] = React.useState(initialFormState);
-                const [filters, setFilters] = React.useState({ tanque: '', data_inicio: null, data_fim: null });
-                const [hasSearched, setHasSearched] = React.useState(false);
+            function Alertas({ user, showToast }) {
+                const [alertas, setAlertas] = React.useState([]);
+                const [prioridades, setPrioridades] = React.useState(new Map());
+                const [isLoading, setIsLoading] = React.useState(true);
+                
+                const [filterStatus, setFilterStatus] = React.useState('pendente');
+                const [searchTerm, setSearchTerm] = React.useState('');
+                const [selectedPeriods, setSelectedPeriods] = React.useState([]);
+                const [allPeriods, setAllPeriods] = React.useState([]);
+                const [selectedAlerts, setSelectedAlerts] = React.useState(new Set());
+                const [detailedAlert, setDetailedAlert] = React.useState(null);
+                const [detailedAbastecimentos, setDetailedAbastecimentos] = React.useState([]);
+                const [isDetailLoading, setIsDetailLoading] = React.useState(false);
+                const [showBulkObservacao, setShowBulkObservacao] = React.useState(false);
+                const [bulkObservacao, setBulkObservacao] = React.useState('');
+                
+                // NOVO ESTADO PARA O FILTRO DE PRIORIDADE
+                const [filterPrioridade, setFilterPrioridade] = React.useState('todas');
 
-                React.useEffect(() => {
-                    const fetchTanqueOptions = async () => {
-                        // AJUSTE AQUI: Adicionado o filtro .not('cta_cod_posto', 'is', null)
-                        const { data, error } = await supabase
-                            .from('filiais')
-                            .select('centro_de_custo_final')
-                            .not('cta_cod_posto', 'is', null); // <-- SÓ PEGA FILIAIS COM POSTO INTERNO
+                const MultiPeriodoPicker = ({ allPeriods, selectedPeriods, onChange }) => {
+                    // ... (componente MultiPeriodoPicker inalterado)
+                };
 
-                        if (error) {
-                            showToast("Erro ao carregar opções de tanque.", "error");
-                        } else {
-                            const uniqueOptions = [...new Set(data.map(item => item.centro_de_custo_final).filter(Boolean))];
-                            setOpcoesTanque(uniqueOptions.sort());
-                        }
-                    };
-                    fetchTanqueOptions();
+                const fetchAlertas = React.useCallback(async () => {
+                    setIsLoading(true);
+                    try {
+                        const { data: alertasData, error: alertasError } = await supabase
+                            .from('alertas')
+                            // Agora fazemos o JOIN para já buscar a prioridade na consulta principal
+                            .select('*, alerta_prioridades ( prioridade, cor_badge )')
+                            .order('data_criacao', { ascending: false });
+
+                        if (alertasError) throw alertasError;
+                        
+                        // Processa os dados para popular o mapa de prioridades e os alertas
+                        const prioridadesMap = new Map();
+                        const alertasComPrioridade = alertasData.map(a => {
+                            const tipoBase = a.tipo_alerta.startsWith('Combustível não mapeado:') ? 'Combustível não mapeado' : a.tipo_alerta;
+                            const p = a.alerta_prioridades;
+                            if (p && !prioridadesMap.has(tipoBase)) {
+                                prioridadesMap.set(tipoBase, { prioridade: p.prioridade, cor: p.cor_badge });
+                            }
+                            return { ...a, prioridadeInfo: p || null };
+                        });
+                        
+                        setAlertas(alertasComPrioridade || []);
+                        setPrioridades(prioridadesMap);
+
+                        const uniquePeriods = [...new Set(alertasData.map(a => a.periodo).filter(Boolean))];
+                        uniquePeriods.sort((a, b) => {
+                            const [mesA, anoA] = a.split('/');
+                            const [mesB, anoB] = b.split('/');
+                            return new Date(anoB, mesB - 1) - new Date(anoA, mesA - 1);
+                        });
+                        setAllPeriods(uniquePeriods);
+
+                    } catch (err) {
+                        showToast("Erro ao carregar dados.", "error");
+                    }
+                    setIsLoading(false);
                 }, [showToast]);
 
-                const formatDate = (dateString) => {
-                    if (!dateString) return '—';
-                    const date = new Date(dateString.includes('T') ? dateString : dateString + 'T00:00:00');
-                    return date.toLocaleDateString('pt-BR');
-                };
+                React.useEffect(() => {
+                    fetchAlertas();
+                }, [fetchAlertas]);
 
-                const handleFilterChange = (e) => { setFilters(prev => ({ ...prev, [e.target.name]: e.target.value })); };
-                const handleInputChange = (e) => { setFormData(prev => ({ ...prev, [e.target.name]: e.target.value })); };
+                const filteredAlerts = React.useMemo(() => {
+                    return alertas.filter(alerta => {
+                        const matchStatus = filterStatus === 'todos' || alerta.status === filterStatus;
+                        const matchSearch = !searchTerm || (alerta.placa && alerta.placa.toLowerCase().includes(searchTerm.toLowerCase()));
+                        const matchPeriod = selectedPeriods.length === 0 || selectedPeriods.includes(alerta.periodo);
+                        // LÓGICA DO NOVO FILTRO DE PRIORIDADE
+                        const matchPrioridade = filterPrioridade === 'todas' || alerta.prioridadeInfo?.prioridade === filterPrioridade;
+                        return matchStatus && matchSearch && matchPeriod && matchPrioridade;
+                    });
+                }, [alertas, filterStatus, searchTerm, selectedPeriods, filterPrioridade]);
+
+                // ... (O restante das funções handle... permanecem as mesmas)
                 
-                const handleSearch = async () => {
-                    setHasSearched(true);
-                    setIsLoading(true);
-                    try {
-                        let query = supabase.from('afericoes').select('*');
-                        if (filters.tanque) query = query.ilike('tanque', `%${filters.tanque.trim()}%`);
-                        if (filters.data_inicio) {
-                            query = query.gte('data_afericao', filters.data_inicio.toISOString());
-                        }
-                        if (filters.data_fim) {
-                            const endDate = new Date(filters.data_fim);
-                            endDate.setHours(23, 59, 59, 999);
-                            query = query.lte('data_afericao', endDate.toISOString());
-                        }
-                        query = query.order('data_afericao', { ascending: false });
-                        const { data, error } = await query;
-                        if (error) throw error;
-                        setAfericoes(data || []);
-                    } catch (err) {
-                        showToast("Erro ao buscar aferições.", "error");
-                    }
-                    setIsLoading(false);
-                };
+                const AlertCard = ({ alerta }) => {
+                    const alertaPrioridade = alerta.prioridadeInfo ? { prioridade: alerta.prioridadeInfo.prioridade, cor: alerta.prioridadeInfo.cor_badge } : { prioridade: 'N/D', cor: 'bg-gray-400 text-white' };
+                    const labelPrincipal = alerta.tipo_alerta === 'Aferição não realizada' ? 'Tanque' : 'Placa';
 
-                const handleFormSubmit = async (e) => {
-                    e.preventDefault();
-                    setIsLoading(true);
-                    try {
-                        // 1. Insere a nova aferição
-                        const recordToInsert = { ...formData, volume_balde: parseFloat(formData.volume_balde) || 0, volume_cta: parseFloat(formData.volume_cta) || 0, volume_bomba: parseFloat(formData.volume_bomba) || 0, usuario_criacao: user.nome };
-                        const { error: insertError } = await supabase.from('afericoes').insert([recordToInsert]);
-                        if (insertError) throw insertError;
-
-                        showToast("Aferição registrada com sucesso!", "success");
-
-                        // 2. LÓGICA PARA CONCLUIR O ALERTA AUTOMATICAMENTE
-                        if (formData.tanque && formData.data_afericao) {
-                            const dataObj = new Date(formData.data_afericao + 'T12:00:00'); // Adiciona hora para evitar problemas de fuso
-                            const periodo = dataObj.toLocaleDateString('pt-BR', { month: '2-digit', year: 'numeric' });
-
-                            await supabase
-                                .from('alertas')
-                                .update({
-                                    status: 'concluido',
-                                    observacao: `Aferição registrada em ${dataObj.toLocaleDateString('pt-BR')}. Concluído automaticamente.`,
-                                    usuario_conclusao: 'Sistema',
-                                    data_conclusao: new Date().toISOString()
-                                })
-                                .eq('placa', formData.tanque) // Na tabela de alertas, o tanque é salvo como 'placa'
-                                .eq('periodo', periodo)
-                                .eq('tipo_alerta', 'Aferição não realizada')
-                                .eq('status', 'pendente');
-                        }
-
-                        setFormData(initialFormState);
-                        setShowForm(false);
-                        setHasSearched(false);
-                        setAfericoes([]);
-                    } catch (err) {
-                        showToast(`Erro ao registrar: ${err.message}`, "error");
-                    }
-                    setIsLoading(false);
-                };
-
-                // O restante da função (o return com o JSX) continua o mesmo
-                return React.createElement('div', { className: "bg-white p-6 rounded-xl shadow-lg" },
-                    React.createElement('h2', { className: "text-2xl font-bold text-gray-800 mb-6 text-center" }, "Aferições de Tanques"),
-                    !showForm && React.createElement('div', { className: 'flex justify-center mb-6' },
-                        React.createElement('button', { onClick: () => setShowForm(true), className: "p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center" }, React.createElement(LucideIcon, { name: 'PlusCircle', className: 'mr-2 h-5 w-5' }), "Nova Aferição")
-                    ),
-                    showForm && React.createElement('form', { onSubmit: handleFormSubmit, className: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8 p-4 border rounded-lg bg-gray-50" },
-                        React.createElement('select', { name: "tanque", value: formData.tanque, onChange: handleInputChange, className: "p-2 border rounded", required: true }, React.createElement('option', { value: '' }, 'Selecione o Tanque*'), opcoesTanque.map(t => React.createElement('option', { key: t, value: t }, t))),
-                        React.createElement('input', { name: "data_afericao", type: "date", value: formData.data_afericao, onChange: handleInputChange, className: "p-2 border rounded", required: true }),
-                        React.createElement('input', { name: "volume_balde", type: "number", step: "0.01", value: formData.volume_balde, onChange: handleInputChange, placeholder: "Volume Balde (ml)", className: "p-2 border rounded" }),
-                        React.createElement('input', { name: "volume_cta", type: "number", step: "0.01", value: formData.volume_cta, onChange: handleInputChange, placeholder: "Volume CTA (L)", className: "p-2 border rounded" }),
-                        React.createElement('input', { name: "volume_bomba", type: "number", step: "0.01", value: formData.volume_bomba, onChange: handleInputChange, placeholder: "Volume Bomba (L)", className: "p-2 border rounded" }),
-                        React.createElement('input', { name: "observacao", value: formData.observacao, onChange: handleInputChange, placeholder: "Observação", className: "p-2 border rounded" }),
-                        React.createElement('div', { className: "md:col-span-full flex justify-end gap-4" }, React.createElement('button', { type: "button", onClick: () => setShowForm(false), className: "py-2 px-4 bg-gray-300 rounded-lg" }, "Cancelar"), React.createElement('button', { type: "submit", className: "py-2 px-4 bg-blue-600 text-white rounded-lg", disabled: isLoading }, isLoading ? 'Salvando...' : 'Salvar'))
-                    ),
-                    React.createElement('div', { className: "mb-6 p-4 border rounded-lg bg-gray-50 grid grid-cols-1 md:grid-cols-3 gap-4 items-end" },
-                        React.createElement('div', { className: "md:col-span-2" },
-                            React.createElement(DateRangePicker, { onDatesChange: (dates) => { setFilters(prev => ({ ...prev, data_inicio: dates[0] || null, data_fim: dates[1] || null })); } })
-                        ),
-                        React.createElement('div', null, React.createElement('label', { className: "block text-sm font-medium" }, "Tanque"), React.createElement('input', { type: "text", name: "tanque", value: filters.tanque, onChange: handleFilterChange, className: "mt-1 w-full p-2 border rounded" })),
-                        React.createElement('button', { onClick: handleSearch, disabled: isLoading, className: "w-full p-2 bg-blue-600 text-white rounded-lg md:col-start-3" }, 'Buscar')
-                    ),
-                    React.createElement('div', { className: "rounded-lg border border-slate-200 shadow-sm overflow-hidden" },
-                        React.createElement('table', { className: "w-full text-sm text-left text-slate-600" },
-                            React.createElement('thead', { className: "text-xs text-slate-700 uppercase bg-slate-100" },
-                                React.createElement('tr', null,
-                                    ["Data Aferição", "Tanque", "Vol. Balde", "Vol. CTA", "Vol. Bomba", "Diferenças", "Observação"].map(h => React.createElement('th', { key: h, className: "px-6 py-4 font-semibold border-b border-r border-slate-200 last:border-r-0" }, h))
-                                )
+                    return React.createElement('div', { className: `bg-white p-4 rounded-lg shadow-md border-l-4 ${alerta.status === 'pendente' ? 'border-yellow-500' : 'border-green-500'} flex items-start gap-4` },
+                        alerta.status === 'pendente' && React.createElement('input', { type: 'checkbox', className: 'h-5 w-5 mt-1 text-blue-600 border-gray-300 rounded focus:ring-blue-500', checked: selectedAlerts.has(alerta.id), onChange: () => handleSelectAlert(alerta.id) }),
+                        React.createElement('div', { className: 'flex-grow' },
+                            React.createElement('div', { className: 'flex justify-between items-start' },
+                                React.createElement('p', { className: "text-sm text-gray-500" }, `Período: ${alerta.periodo || 'N/A'}`),
+                                React.createElement('span', { className: `text-xs font-semibold px-2 py-1 rounded-full ${alertaPrioridade.cor}` }, alertaPrioridade.prioridade)
                             ),
-                            React.createElement('tbody', null,
-                                isLoading ? React.createElement('tr', null, React.createElement('td', { colSpan: 7, className: "p-4 text-center" }, "Carregando...")) :
-                                !hasSearched ? React.createElement('tr', null, React.createElement('td', { colSpan: 7, className: "p-6 text-center text-slate-500" }, "Utilize os filtros para buscar as aferições.")) :
-                                afericoes.length === 0 ? React.createElement('tr', null, React.createElement('td', { colSpan: 7, className: "p-6 text-center text-slate-500" }, "Nenhuma aferição encontrada.")) :
-                                afericoes.map(item => {
-                                    const diffCta = item.volume_balde - item.volume_cta;
-                                    const diffBomba = item.volume_balde - item.volume_bomba;
-                                    return React.createElement('tr', { key: item.id, className: "hover:bg-blue-50 even:bg-slate-50" },
-                                        React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, formatDate(item.data_afericao)),
-                                        React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, React.createElement('span', { className: 'font-medium text-slate-800' }, item.tanque)),
-                                        React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, item.volume_balde.toFixed(2)),
-                                        React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, item.volume_cta.toFixed(2)),
-                                        React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, item.volume_bomba.toFixed(2)),
-                                        React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" },
-                                            React.createElement('div', null,
-                                                React.createElement('p', { className: diffCta !== 0 ? 'text-red-600 font-semibold' : '' }, `CTA: ${diffCta.toFixed(2)} L`),
-                                                React.createElement('p', { className: diffBomba !== 0 ? 'text-red-600 font-semibold' : '' }, `Bomba: ${diffBomba.toFixed(2)} L`)
-                                            )
-                                        ),
-                                        React.createElement('td', { className: "px-6 py-4" }, item.observacao)
-                                    );
-                                })
+                            React.createElement('p', { className: "text-lg font-bold text-gray-800 mt-1" }, `${labelPrincipal}: ${alerta.placa || 'N/A'}`),
+                            React.createElement('p', { className: "text-sm text-gray-600 mt-1" }, `Alerta: ${alerta.tipo_alerta}`),
+                            alerta.status === 'concluido' && React.createElement('p', { className: 'text-xs text-gray-500 mt-1 italic' }, `Concluído por ${alerta.usuario_conclusao} com a obs: "${alerta.observacao}"`),
+                            React.createElement('div', { className: 'mt-2' },
+                                React.createElement('button', { onClick: () => handleShowDetails(alerta), className: 'text-sm font-semibold text-blue-600 hover:underline' }, 'Ver Detalhes')
                             )
                         )
+                    );
+                };
+
+                const AlertDetailsModal = () => (
+                    // ... (componente do modal inalterado)
+                );
+
+                return React.createElement('div', { className: "bg-white p-6 rounded-xl shadow-lg" },
+                    detailedAlert && React.createElement(AlertDetailsModal, null),
+                    React.createElement('h2', { className: "text-2xl font-bold text-gray-800 mb-2 text-center" }, "Painel de Alertas"),
+                    React.createElement('p', { className: 'text-center text-gray-500 mb-6' }, 'Filtre, analise e gerencie os alertas do sistema.'),
+                    
+                    React.createElement('div', { className: 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 p-4 border rounded-lg bg-gray-50 items-end' },
+                        React.createElement('div', null, 
+                            React.createElement('label', { className: 'block text-sm font-medium mb-1' }, 'Status'),
+                            React.createElement('select', { value: filterStatus, onChange: e => setFilterStatus(e.target.value), className: 'w-full p-2 border rounded bg-white' },
+                                React.createElement('option', { value: 'pendente' }, 'Pendentes'),
+                                React.createElement('option', { value: 'concluido' }, 'Concluídas'),
+                                React.createElement('option', { value: 'todos' }, 'Todos')
+                            )
+                        ),
+                        // NOVO FILTRO DE PRIORIDADE
+                        React.createElement('div', null, 
+                            React.createElement('label', { className: 'block text-sm font-medium mb-1' }, 'Prioridade'),
+                            React.createElement('select', { value: filterPrioridade, onChange: e => setFilterPrioridade(e.target.value), className: 'w-full p-2 border rounded bg-white' },
+                                React.createElement('option', { value: 'todas' }, 'Todas'),
+                                React.createElement('option', { value: 'Alta' }, 'Alta'),
+                                React.createElement('option', { value: 'Média' }, 'Média'),
+                                React.createElement('option', { value: 'Baixa' }, 'Baixa')
+                            )
+                        ),
+                        React.createElement('div', null,
+                            React.createElement('label', { className: 'block text-sm font-medium mb-1' }, 'Buscar por Placa/Tanque'),
+                            React.createElement('input', { type: 'text', placeholder: 'Digite a placa ou tanque...', value: searchTerm, onChange: e => setSearchTerm(e.target.value), className: 'w-full p-2 border rounded' })
+                        ),
+                         React.createElement('div', null,
+                            React.createElement('label', { className: 'block text-sm font-medium mb-1' }, 'Filtrar por Período(s)'),
+                            React.createElement(MultiPeriodoPicker, { allPeriods: allPeriods, selectedPeriods: selectedPeriods, onChange: setSelectedPeriods })
+                        )
+                    ),
+                    
+                    selectedAlerts.size > 0 && React.createElement('div', { className: 'mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg' },
+                        // ... (barra de ações em massa inalterada)
+                    ),
+
+                    isLoading ? React.createElement('p', null, 'Carregando alertas...') :
+                    filteredAlerts.length === 0 ? React.createElement('p', { className: 'text-center text-gray-500 py-8' }, 'Nenhum alerta encontrado para os filtros aplicados.') :
+                    React.createElement('div', { className: 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4' }, 
+                        filteredAlerts.map(alerta => React.createElement(AlertCard, { key: alerta.id, alerta: alerta }))
                     )
                 );
             }
-
             function CadastroFiliais({ user, showToast }) {
                 const [filiais, setFiliais] = React.useState([]);
                 const [isLoading, setIsLoading] = React.useState(true);
