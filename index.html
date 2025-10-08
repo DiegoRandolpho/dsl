@@ -488,8 +488,11 @@ function ShellAbastecimentos({ user, showToast }) {
                 const [isImporting, setIsImporting] = React.useState(false);
                 const [filters, setFilters] = React.useState({ placa: '', data_inicio: null, data_fim: null, cnpj: '' });
                 const [hasSearched, setHasSearched] = React.useState(false);
-
                 const [combustivelMap, setCombustivelMap] = React.useState(new Map());
+
+                // NOVO ESTADO PARA CONTROLE DE PROGRESSO
+                const [progress, setProgress] = React.useState(null);
+
                 React.useEffect(() => {
                     const fetchMapping = async () => {
                         const { data, error } = await supabase.from('combustivel_mapeamento').select('nome_original, nome_padronizado');
@@ -542,9 +545,11 @@ function ShellAbastecimentos({ user, showToast }) {
                 const handleImport = () => {
                     if (!file) { return showToast("Por favor, selecione um arquivo.", "error"); }
                     setIsImporting(true);
+                    setProgress({ percentage: 0, message: 'Iniciando importação...' });
                     const reader = new FileReader();
                     reader.onload = async (e) => {
                         try {
+                            setProgress({ percentage: 25, message: 'Lendo e processando a planilha...' });
                             const data = new Uint8Array(e.target.result);
                             const workbook = XLSX.read(data, { type: 'array', cellDates: true });
                             const sheetName = workbook.SheetNames[0];
@@ -552,7 +557,6 @@ function ShellAbastecimentos({ user, showToast }) {
                             const json = XLSX.utils.sheet_to_json(worksheet);
                             const dataToInsert = json
                                 .filter(row => row['Status'] && row['Status'].toLowerCase() === 'sucesso')
-                                // NOVO FILTRO ADICIONADO AQUI para ignorar o CNPJ específico
                                 .filter(row => row['CNPJ do posto'] !== "07015016000117")
                                 .map(row => {
                                     const transacaoDate = row['Data/Hora transação'];
@@ -578,45 +582,61 @@ function ShellAbastecimentos({ user, showToast }) {
                                         data_criacao: new Date().toISOString(),
                                     };
                                 });
-
+                            
                             if (dataToInsert.length === 0) {
-                                showToast("Nenhum registro válido (com status 'Sucesso' e CNPJ permitido) foi encontrado na planilha.", "info");
-                                setIsImporting(false);
-                                return;
+                                throw new Error("Nenhum registro válido encontrado na planilha.");
                             }
                             
+                            setProgress({ percentage: 50, message: 'Salvando dados no banco de dados...' });
                             const { error } = await supabase.from('shell_abastecimentos').insert(dataToInsert, { returning: 'minimal' });
-                            if (error) { console.error("Erro do Supabase:", error); throw error; }
+                            if (error) throw error;
                             
-                            showToast(`${dataToInsert.length} registros importados! Sincronizando alertas...`, "success");
-
+                            setProgress({ percentage: 75, message: 'Verificando e gerando alertas...' });
                             const dadosParaAlerta = dataToInsert.map(item => ({ placa: item.placa, data: item.data_hora_transacao, combustivelOriginal: item.combustivel }));
-                            gerarAlertasEmLote(dadosParaAlerta, 'shell', combustivelMap).catch(err => {
-                                console.error("Erro ao gerar alertas em lote para Shell:", err);
-                                showToast("Erro ao gerar alertas.", "error");
-                            });
+                            await gerarAlertasEmLote(dadosParaAlerta, 'shell', combustivelMap);
+                            
+                            setProgress({ percentage: 100, message: 'Importação concluída com sucesso!' });
+                            showToast(`${dataToInsert.length} registros importados!`);
 
-                            setFile(null); 
-                            document.getElementById('file-input-shell').value = '';
-                            setHasSearched(false);
-                            setAbastecimentos([]);
+                            setTimeout(() => {
+                                setFile(null); 
+                                document.getElementById('file-input-shell').value = '';
+                                setHasSearched(false);
+                                setAbastecimentos([]);
+                                setProgress(null);
+                                setIsImporting(false);
+                            }, 2000);
+
                         } catch (err) {
-                            showToast(`Erro ao processar o arquivo: ${err.message}`, "error");
+                            showToast(`Erro: ${err.message}`, "error");
+                            setProgress(null);
+                            setIsImporting(false);
                         }
-                        setIsImporting(false);
                     };
                     reader.readAsArrayBuffer(file);
                 };
 
                 return React.createElement('div', { className: "bg-white p-6 rounded-xl shadow-lg" },
                     React.createElement('h2', { className: "text-2xl font-bold text-gray-800 mb-6 text-center" }, "Importação Shell"),
-                    React.createElement('div', { className: "mb-8 p-4 border rounded-lg bg-gray-100 grid grid-cols-1 md:grid-cols-2 gap-4 items-end" },
+                    React.createElement('div', { className: "mb-8 p-4 border rounded-lg bg-gray-100 grid grid-cols-1 md:grid-cols-2 gap-4 items-center" },
                         React.createElement('div', null,
                             React.createElement('label', { htmlFor: 'file-input-shell', className: "block text-sm font-medium text-gray-700 mb-1" }, "Importar Planilha Shell"),
                             React.createElement('input', { id: 'file-input-shell', type: "file", onChange: handleFileChange, className: "w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100", accept: ".xlsx, .xls, .csv" })
                         ),
-                        React.createElement('button', { onClick: handleImport, disabled: isImporting, className: "w-full p-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 transition" }, isImporting ? 'Importando...' : 'Importar Dados')
+                        // LÓGICA DE EXIBIÇÃO DO PROGRESSO
+                        isImporting && progress ?
+                            React.createElement('div', { className: 'w-full' },
+                                React.createElement('p', { className: 'text-sm text-center text-gray-600 mb-1' }, `${progress.message}`),
+                                React.createElement('div', { className: 'w-full bg-gray-200 rounded-full h-4' },
+                                    React.createElement('div', {
+                                        className: 'bg-blue-600 h-4 rounded-full text-center text-white text-xs leading-4',
+                                        style: { width: `${progress.percentage}%` }
+                                    }, `${progress.percentage}%`)
+                                )
+                            ) :
+                            React.createElement('button', { onClick: handleImport, disabled: isImporting || !file, className: "w-full p-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 transition" }, 'Importar Dados')
                     ),
+                    // O resto do JSX continua o mesmo...
                     React.createElement('div', { className: "mb-6 p-4 border rounded-lg bg-gray-50 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end" },
                         React.createElement('div', { className: "lg:col-span-2" },
                             React.createElement(DateRangePicker, { onDatesChange: (dates) => { setFilters(prev => ({...prev, data_inicio: dates[0] || null, data_fim: dates[1] || null })); } })
@@ -657,6 +677,9 @@ function ShellAbastecimentos({ user, showToast }) {
                 const [file, setFile] = React.useState(null);
                 const [isImporting, setIsImporting] = React.useState(false);
                 const [filters, setFilters] = React.useState({ searchTerm: '', data_inicio: null, data_fim: null });
+                
+                const [progress, setProgress] = React.useState(null);
+
                 const formatDate = (dateString) => {
                     if (!dateString) return '—';
                     if (typeof dateString === 'number' && dateString > 1) {
@@ -692,11 +715,13 @@ function ShellAbastecimentos({ user, showToast }) {
                     setIsLoading(false);
                 };
                 const handleImport = () => {
-                    if (!file) { showToast("Por favor, selecione um arquivo para importar.", "error"); return; }
+                    if (!file) { return showToast("Por favor, selecione um arquivo.", "error"); }
                     setIsImporting(true);
+                    setProgress({ percentage: 0, message: 'Iniciando importação...' });
                     const reader = new FileReader();
                     reader.onload = async (e) => {
                         try {
+                            setProgress({ percentage: 33, message: 'Lendo e processando a planilha...' });
                             const data = new Uint8Array(e.target.result);
                             const workbook = XLSX.read(data, { type: 'array', cellDates: true });
                             const sheetName = workbook.SheetNames[0];
@@ -724,17 +749,27 @@ function ShellAbastecimentos({ user, showToast }) {
                                     data_criacao: new Date().toISOString(),
                                 };
                             });
-                            if (dataToInsert.length === 0) { showToast("Nenhum dado válido encontrado na planilha.", "info"); setIsImporting(false); return; }
+                            if (dataToInsert.length === 0) { throw new Error("Nenhum dado válido encontrado."); }
+                            
+                            setProgress({ percentage: 66, message: 'Salvando dados no banco de dados...' });
                             const { error } = await supabase.from('cta_carregamentos').insert(dataToInsert);
-                            if (error) { console.error("Erro do Supabase:", error); throw error; }
+                            if (error) throw error;
+
+                            setProgress({ percentage: 100, message: 'Concluído!' });
                             showToast(`${dataToInsert.length} registros importados com sucesso!`, "success");
-                            setFile(null);
-                            document.getElementById('file-input-cta-carreg').value = '';
-                            setCarregamentos([]);
+
+                            setTimeout(() => {
+                                setFile(null);
+                                document.getElementById('file-input-cta-carreg').value = '';
+                                setCarregamentos([]);
+                                setProgress(null);
+                                setIsImporting(false);
+                            }, 2000);
                         } catch (err) {
                             showToast(`Erro ao processar o arquivo: ${err.message}`, "error");
+                            setProgress(null);
+                            setIsImporting(false);
                         }
-                        setIsImporting(false);
                     };
                     reader.readAsArrayBuffer(file);
                 };
@@ -774,6 +809,7 @@ function ShellAbastecimentos({ user, showToast }) {
                     };
                     fetchInitialData();
                 }, [showToast]);
+                
                 return React.createElement('div', { className: "bg-white p-6 rounded-xl shadow-lg" },
                     React.createElement('h2', { className: "text-2xl font-bold text-gray-800 mb-6 text-center" }, "Carregamentos"),
                     React.createElement('div', { className: "flex justify-end mb-4" },
@@ -792,12 +828,22 @@ function ShellAbastecimentos({ user, showToast }) {
                             React.createElement('button', { type: "submit", className: "py-2 px-4 bg-blue-600 text-white rounded-lg", disabled: isLoading }, isLoading ? 'Salvando...' : 'Salvar')
                         )
                     ),
-                    React.createElement('div', { className: "mb-8 p-4 border rounded-lg bg-gray-100 grid grid-cols-1 md:grid-cols-2 gap-4 items-end" },
+                    React.createElement('div', { className: "mb-8 p-4 border rounded-lg bg-gray-100 grid grid-cols-1 md:grid-cols-2 gap-4 items-center" },
                         React.createElement('div', null,
                             React.createElement('label', { htmlFor: 'file-input-cta-carreg', className: "block text-sm font-medium text-gray-700 mb-1" }, "Importar Planilha (.xlsx, .xls, .csv)"),
                             React.createElement('input', { id: 'file-input-cta-carreg', type: "file", onChange: handleFileChange, className: "w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100", accept: ".xlsx, .xls, .csv" })
                         ),
-                        React.createElement('button', { onClick: handleImport, disabled: isImporting, className: "w-full p-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 transition" }, isImporting ? 'Importando...' : 'Importar Dados')
+                        isImporting && progress ?
+                            React.createElement('div', { className: 'w-full' },
+                                React.createElement('p', { className: 'text-sm text-center text-gray-600 mb-1' }, `${progress.message}`),
+                                React.createElement('div', { className: 'w-full bg-gray-200 rounded-full h-4' },
+                                    React.createElement('div', {
+                                        className: 'bg-blue-600 h-4 rounded-full text-center text-white text-xs leading-4',
+                                        style: { width: `${progress.percentage}%` }
+                                    }, `${progress.percentage}%`)
+                                )
+                            ) :
+                            React.createElement('button', { onClick: handleImport, disabled: isImporting || !file, className: "w-full p-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 transition" }, 'Importar Dados')
                     ),
                     React.createElement('div', { className: "mb-6 p-4 border rounded-lg bg-gray-50 grid grid-cols-1 md:grid-cols-3 gap-4 items-end" },
                         React.createElement('div', { className: 'md:col-span-2' },
@@ -837,7 +883,6 @@ function ShellAbastecimentos({ user, showToast }) {
                     )
                 );
             }
-
             function CtaAbastecimentos({ user, showToast }) {
                 const [abastecimentos, setAbastecimentos] = React.useState([]);
                 const [isLoading, setIsLoading] = React.useState(false);
@@ -848,6 +893,9 @@ function ShellAbastecimentos({ user, showToast }) {
                 const [isImporting, setIsImporting] = React.useState(false);
                 const [filters, setFilters] = React.useState({ placa: '', data_inicio: null, data_fim: null, cod_posto: '' });
                 const [hasSearched, setHasSearched] = React.useState(false);
+
+                const [progress, setProgress] = React.useState(null);
+
                 const formatDate = (dateString) => {
                     if (!dateString) return '—';
                     return new Date(dateString).toLocaleString('pt-BR');
@@ -907,9 +955,11 @@ function ShellAbastecimentos({ user, showToast }) {
                 const handleImport = () => {
                     if (!file) { return showToast("Por favor, selecione um arquivo.", "error"); }
                     setIsImporting(true);
+                    setProgress({ percentage: 0, message: 'Iniciando importação...' });
                     const reader = new FileReader();
                     reader.onload = async (e) => {
                         try {
+                            setProgress({ percentage: 33, message: 'Lendo e processando a planilha...' });
                             const data = new Uint8Array(e.target.result);
                             const workbook = XLSX.read(data, { type: 'array', cellDates: true });
                             const sheetName = workbook.SheetNames[0];
@@ -940,21 +990,29 @@ function ShellAbastecimentos({ user, showToast }) {
                                 };
                             });
                             if (dataToInsert.length === 0) {
-                                showToast("Nenhum dado válido encontrado na planilha.", "info");
-                                setIsImporting(false);
-                                return;
+                                throw new Error("Nenhum dado válido encontrado.");
                             }
+                            
+                            setProgress({ percentage: 66, message: 'Salvando dados no banco de dados...' });
                             const { error } = await supabase.from('cta_abastecimentos').insert(dataToInsert, { returning: 'minimal' });
-                            if (error) { console.error("Erro do Supabase:", error); throw error; }
+                            if (error) throw error;
+
+                            setProgress({ percentage: 100, message: 'Concluído!' });
                             showToast(`${dataToInsert.length} registros importados com sucesso!`, "success");
-                            setFile(null); 
-                            document.getElementById('file-input-cta-abs').value = '';
-                            setHasSearched(false);
-                            setAbastecimentos([]);
+
+                            setTimeout(() => {
+                                setFile(null); 
+                                document.getElementById('file-input-cta-abs').value = '';
+                                setHasSearched(false);
+                                setAbastecimentos([]);
+                                setProgress(null);
+                                setIsImporting(false);
+                            }, 2000);
                         } catch (err) {
                             showToast(`Erro ao processar o arquivo: ${err.message}`, "error");
+                            setProgress(null);
+                            setIsImporting(false);
                         }
-                        setIsImporting(false);
                     };
                     reader.readAsArrayBuffer(file);
                 };
@@ -978,12 +1036,22 @@ function ShellAbastecimentos({ user, showToast }) {
                             React.createElement('button', { type: "submit", className: "py-2 px-4 bg-blue-600 text-white rounded-lg", disabled: isLoading }, isLoading ? 'Salvando...' : 'Salvar')
                         )
                     ),
-                    React.createElement('div', { className: "mb-8 p-4 border rounded-lg bg-gray-100 grid grid-cols-1 md:grid-cols-2 gap-4 items-end" },
+                    React.createElement('div', { className: "mb-8 p-4 border rounded-lg bg-gray-100 grid grid-cols-1 md:grid-cols-2 gap-4 items-center" },
                         React.createElement('div', null,
                             React.createElement('label', { htmlFor: 'file-input-cta-abs', className: "block text-sm font-medium text-gray-700 mb-1" }, "Importar Planilha"),
                             React.createElement('input', { id: 'file-input-cta-abs', type: "file", onChange: handleFileChange, className: "w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100", accept: ".xlsx, .xls, .csv" })
                         ),
-                        React.createElement('button', { onClick: handleImport, disabled: isImporting, className: "w-full p-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 transition" }, isImporting ? 'Importando...' : 'Importar Dados')
+                        isImporting && progress ?
+                            React.createElement('div', { className: 'w-full' },
+                                React.createElement('p', { className: 'text-sm text-center text-gray-600 mb-1' }, `${progress.message}`),
+                                React.createElement('div', { className: 'w-full bg-gray-200 rounded-full h-4' },
+                                    React.createElement('div', {
+                                        className: 'bg-blue-600 h-4 rounded-full text-center text-white text-xs leading-4',
+                                        style: { width: `${progress.percentage}%` }
+                                    }, `${progress.percentage}%`)
+                                )
+                            ) :
+                            React.createElement('button', { onClick: handleImport, disabled: isImporting || !file, className: "w-full p-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 transition" }, 'Importar Dados')
                     ),
                     React.createElement('div', { className: "mb-6 p-4 border rounded-lg bg-gray-50 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end" },
                         React.createElement('div', { className: "lg:col-span-2" },
@@ -1029,6 +1097,10 @@ function ShellAbastecimentos({ user, showToast }) {
                 const [filters, setFilters] = React.useState({ placa: '', data_inicio: null, data_fim: null, cidade: '', nome_estabelecimento: '' });
                 const [hasSearched, setHasSearched] = React.useState(false);
                 const [combustivelMap, setCombustivelMap] = React.useState(new Map());
+                
+                // NOVO ESTADO PARA CONTROLE DE PROGRESSO
+                const [progress, setProgress] = React.useState(null);
+
                 React.useEffect(() => {
                     const fetchMapping = async () => {
                         const { data, error } = await supabase.from('combustivel_mapeamento').select('nome_original, nome_padronizado');
@@ -1041,6 +1113,7 @@ function ShellAbastecimentos({ user, showToast }) {
                     };
                     fetchMapping();
                 }, [showToast]);
+
                 const formatDate = (dateString) => {
                     if (!dateString) return '—';
                     return new Date(dateString).toLocaleString('pt-BR');
@@ -1078,19 +1151,21 @@ function ShellAbastecimentos({ user, showToast }) {
                         setFile(e.target.files[0]);
                     }
                 };
+
                 const handleImport = () => {
                     if (!file) { return showToast("Por favor, selecione um arquivo.", "error"); }
                     setIsImporting(true);
+                    setProgress({ percentage: 0, message: 'Iniciando importação...' });
                     const reader = new FileReader();
                     reader.onload = async (e) => {
                         try {
+                            setProgress({ percentage: 25, message: 'Lendo e processando a planilha...' });
                             const data = new Uint8Array(e.target.result);
                             const workbook = XLSX.read(data, { type: 'array', cellDates: true });
                             const sheetName = workbook.SheetNames[0];
                             const worksheet = workbook.Sheets[sheetName];
                             const json = XLSX.utils.sheet_to_json(worksheet);
                             
-                            // Coleta o nome original do combustível ANTES de padronizar
                             const dataToProcess = json.slice(0, -1).map(row => ({
                                 raw: row,
                                 combustivelOriginal: row['TIPO COMBUSTIVEL']
@@ -1132,72 +1207,76 @@ function ShellAbastecimentos({ user, showToast }) {
                             });
 
                             if (dataToInsert.length === 0) {
-                                showToast("Nenhum dado válido encontrado na planilha.", "info");
-                                setIsImporting(false);
-                                return;
+                                throw new Error("Nenhum dado válido encontrado na planilha.");
                             }
                             
+                            setProgress({ percentage: 50, message: 'Salvando dados no banco de dados...' });
                             const { error } = await supabase.from('ticket_abastecimentos').insert(dataToInsert, { returning: 'minimal' });
-                            if (error) { console.error("Erro do Supabase:", error); throw error; }
+                            if (error) throw error;
 
-                            showToast(`${dataToInsert.length} registros importados! Sincronizando alertas...`, "success");
-
-                            // AJUSTE: Passa também o nome original do combustível
+                            setProgress({ percentage: 75, message: 'Verificando e gerando alertas...' });
                             const dadosParaAlerta = dataToInsert.map((item, index) => ({ 
                                 placa: item.placa, 
                                 data: item.data_transacao, 
                                 combustivelOriginal: dataToProcess[index].combustivelOriginal 
                             }));
-                            gerarAlertasEmLote(dadosParaAlerta, 'ticket', combustivelMap).catch(err => {
-                                console.error("Erro ao gerar alertas em lote para Ticket:", err);
-                                showToast("Erro ao gerar alertas.", "error");
-                            });
+                            await gerarAlertasEmLote(dadosParaAlerta, 'ticket', combustivelMap);
 
-                            setFile(null); 
-                            document.getElementById('file-input-ticket').value = '';
-                            setHasSearched(false);
-                            setAbastecimentos([]);
+                            setProgress({ percentage: 100, message: 'Importação concluída com sucesso!' });
+                            showToast(`${dataToInsert.length} registros importados!`);
+                            
+                            setTimeout(() => {
+                                setFile(null); 
+                                document.getElementById('file-input-ticket').value = '';
+                                setHasSearched(false);
+                                setAbastecimentos([]);
+                                setProgress(null);
+                                setIsImporting(false);
+                            }, 2000);
+
                         } catch (err) {
-                            showToast(`Erro ao processar o arquivo: ${err.message}`, "error");
+                            showToast(`Erro: ${err.message}`, "error");
+                            setProgress(null);
+                            setIsImporting(false);
                         }
-                        setIsImporting(false);
                     };
                     reader.readAsArrayBuffer(file);
                 };
+
                 return React.createElement('div', { className: "bg-white p-6 rounded-xl shadow-lg" },
                     React.createElement('h2', { className: "text-2xl font-bold text-gray-800 mb-6 text-center" }, "Ticket Abastecimentos"),
-                    React.createElement('div', { className: "mb-8 p-4 border rounded-lg bg-gray-100 grid grid-cols-1 md:grid-cols-2 gap-4 items-end" },
+                    React.createElement('div', { className: "mb-8 p-4 border rounded-lg bg-gray-100 grid grid-cols-1 md:grid-cols-2 gap-4 items-center" },
                         React.createElement('div', null,
                             React.createElement('label', { htmlFor: 'file-input-ticket', className: "block text-sm font-medium text-gray-700 mb-1" }, "Importar Planilha de Transações"),
                             React.createElement('input', { id: 'file-input-ticket', type: "file", onChange: handleFileChange, className: "w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100", accept: ".xlsx, .xls, .csv" })
                         ),
-                        React.createElement('button', { onClick: handleImport, disabled: isImporting, className: "w-full p-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 transition" }, isImporting ? 'Importando...' : 'Importar Dados')
+                        // LÓGICA DE EXIBIÇÃO DO PROGRESSO
+                        isImporting && progress ?
+                            React.createElement('div', { className: 'w-full' },
+                                React.createElement('p', { className: 'text-sm text-center text-gray-600 mb-1' }, `${progress.message}`),
+                                React.createElement('div', { className: 'w-full bg-gray-200 rounded-full h-4' },
+                                    React.createElement('div', {
+                                        className: 'bg-blue-600 h-4 rounded-full text-center text-white text-xs leading-4',
+                                        style: { width: `${progress.percentage}%` }
+                                    }, `${progress.percentage}%`)
+                                )
+                            ) :
+                            React.createElement('button', { onClick: handleImport, disabled: isImporting || !file, className: "w-full p-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 transition" }, 'Importar Dados')
                     ),
+                    // O resto do JSX continua o mesmo...
                     React.createElement('div', { className: "mb-6 p-4 border rounded-lg bg-gray-50 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end" },
                         React.createElement('div', { className: "lg:col-span-2" },
-                            React.createElement(DateRangePicker, {
-                                onDatesChange: (dates) => {
-                                    setFilters(prev => ({ ...prev, data_inicio: dates[0] || null, data_fim: dates[1] || null }));
-                                }
-                            })
+                            React.createElement(DateRangePicker, { onDatesChange: (dates) => { setFilters(prev => ({ ...prev, data_inicio: dates[0] || null, data_fim: dates[1] || null })); } })
                         ),
-                        React.createElement('div', null, 
-                            React.createElement('label', { className: "block text-sm font-medium" }, "Placa"), 
-                            React.createElement('input', { type: "text", name: "placa", value: filters.placa, onChange: handleFilterChange, className: "mt-1 w-full p-2 border rounded" })
-                        ),
-                        React.createElement('div', null, 
-                            React.createElement('label', { className: "block text-sm font-medium" }, "Estabelecimento"), 
-                            React.createElement('input', { type: "text", name: "nome_estabelecimento", value: filters.nome_estabelecimento, onChange: handleFilterChange, className: "mt-1 w-full p-2 border rounded" })
-                        ),
+                        React.createElement('div', null, React.createElement('label', { className: "block text-sm font-medium" }, "Placa"), React.createElement('input', { type: "text", name: "placa", value: filters.placa, onChange: handleFilterChange, className: "mt-1 w-full p-2 border rounded" })),
+                        React.createElement('div', null, React.createElement('label', { className: "block text-sm font-medium" }, "Estabelecimento"), React.createElement('input', { type: "text", name: "nome_estabelecimento", value: filters.nome_estabelecimento, onChange: handleFilterChange, className: "mt-1 w-full p-2 border rounded" })),
                         React.createElement('button', { onClick: handleSearch, disabled: isLoading, className: "w-full p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition lg:col-start-4" }, 'Buscar')
                     ),
                     React.createElement('div', { className: "rounded-lg border border-slate-200 shadow-sm overflow-hidden" },
                         React.createElement('table', { className: "w-full text-sm text-left text-slate-600" },
                             React.createElement('thead', { className: "text-xs text-slate-700 uppercase bg-slate-100" },
                                 React.createElement('tr', null,
-                                    ["Data", "Placa", "Estabelecimento", "Combustível", "Litros", "Vl/Litro", "Valor Total"].map(h => 
-                                        React.createElement('th', { key: h, className: "px-6 py-4 font-semibold border-b border-r border-slate-200 last:border-r-0" }, h)
-                                    )
+                                    ["Data", "Placa", "Estabelecimento", "Combustível", "Litros", "Vl/Litro", "Valor Total"].map(h => React.createElement('th', { key: h, className: "px-6 py-4 font-semibold border-b border-r border-slate-200 last:border-r-0" }, h))
                                 )
                             ),
                             React.createElement('tbody', null,
@@ -1218,7 +1297,6 @@ function ShellAbastecimentos({ user, showToast }) {
                     )
                 );
             }
-
             function Afericoes({ user, showToast }) {
                 const [afericoes, setAfericoes] = React.useState([]);
                 const [isLoading, setIsLoading] = React.useState(false);
