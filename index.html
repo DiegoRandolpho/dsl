@@ -725,13 +725,35 @@
                 const [chartData, setChartData] = React.useState({ overTime: null, byType: null });
                 const [isLoading, setIsLoading] = React.useState(true);
 
-                // Componente reutilizável para renderizar os gráficos
-                const ChartComponent = ({ chartId, type, data, options }) => {
+                // Objeto centralizado para cores, garantindo consistência
+                const priorityColors = {
+                    'Alta': { border: 'border-red-500', rgb: '239, 68, 68' },
+                    'Média': { border: 'border-yellow-500', rgb: '234, 179, 8' },
+                    'Baixa': { border: 'border-blue-500', rgb: '59, 130, 246' },
+                    'Concluído': { border: 'border-green-500', rgb: '34, 197, 94' }
+                };
+
+                const ChartComponent = ({ chartId, type, data, options, onClick }) => {
                     const canvasRef = React.useRef(null);
                     React.useEffect(() => {
                         if (!canvasRef.current || !data) return;
-                        const chart = new Chart(canvasRef.current, { type, data, options });
-                        return () => chart.destroy(); // Limpa o gráfico ao desmontar
+                        
+                        const chart = new Chart(canvasRef.current, { 
+                            type, 
+                            data, 
+                            options: {
+                                ...options,
+                                // Adiciona a funcionalidade de clique ao gráfico
+                                onClick: (event, elements) => {
+                                    if (onClick && elements.length > 0) {
+                                        const elementIndex = elements[0].index;
+                                        const clickedLabel = chart.data.labels[elementIndex];
+                                        onClick(clickedLabel);
+                                    }
+                                }
+                            } 
+                        });
+                        return () => chart.destroy();
                     }, [data, type, options]);
                     return React.createElement('canvas', { ref: canvasRef, id: chartId });
                 };
@@ -740,19 +762,14 @@
                     const fetchData = async () => {
                         setIsLoading(true);
                         try {
-                            // Usamos Promise.all para buscar dados para os cards e gráficos em paralelo
                             const [countsRes, overTimeRes, byTypeRes] = await Promise.all([
-                                // Query para os cards de contagem
                                 supabase.from('alertas').select('alerta_prioridades(prioridade)').eq('status', 'pendente'),
-                                // Query para o gráfico de linha (agrupado por período)
                                 supabase.from('alertas').select('periodo, status').order('periodo', { ascending: true }),
-                                // Query para o gráfico de pizza (agrupado por tipo)
                                 supabase.from('alertas').select('tipo_alerta').eq('status', 'pendente')
                             ]);
                             
                             if (countsRes.error || overTimeRes.error || byTypeRes.error) throw new Error("Falha ao buscar dados para o dashboard.");
 
-                            // 1. Processa dados para os cards de contagem
                             const counts = countsRes.data.reduce((acc, alerta) => {
                                 const prioridade = alerta.alerta_prioridades?.prioridade || 'N/D';
                                 acc[prioridade] = (acc[prioridade] || 0) + 1;
@@ -761,7 +778,6 @@
                             }, { Alta: 0, Média: 0, Baixa: 0, total: 0 });
                             setStats(counts);
 
-                            // 2. Processa dados para o gráfico de linha (Alertas por Período)
                             const overTimeProcessed = overTimeRes.data.reduce((acc, { periodo, status }) => {
                                 if (!periodo) return acc;
                                 acc[periodo] = acc[periodo] || { pendente: 0, concluido: 0 };
@@ -773,12 +789,11 @@
                             setChartData(prev => ({ ...prev, overTime: {
                                 labels: overTimeLabels,
                                 datasets: [
-                                    { label: 'Pendentes', data: overTimeLabels.map(p => overTimeProcessed[p].pendente), borderColor: 'rgb(234, 179, 8)', backgroundColor: 'rgba(234, 179, 8, 0.5)', tension: 0.1 },
-                                    { label: 'Concluídos', data: overTimeLabels.map(p => overTimeProcessed[p].concluido), borderColor: 'rgb(34, 197, 94)', backgroundColor: 'rgba(34, 197, 94, 0.5)', tension: 0.1 }
+                                    { label: 'Pendentes', data: overTimeLabels.map(p => overTimeProcessed[p].pendente), borderColor: `rgb(${priorityColors.Média.rgb})`, backgroundColor: `rgba(${priorityColors.Média.rgb}, 0.5)`, tension: 0.1, pointRadius: 5, pointHoverRadius: 7 },
+                                    { label: 'Concluídos', data: overTimeLabels.map(p => overTimeProcessed[p].concluido), borderColor: `rgb(${priorityColors.Concluído.rgb})`, backgroundColor: `rgba(${priorityColors.Concluído.rgb}, 0.5)`, tension: 0.1, pointRadius: 5, pointHoverRadius: 7 }
                                 ]
                             }}));
 
-                            // 3. Processa dados para o gráfico de pizza (Alertas por Tipo)
                             const byTypeProcessed = byTypeRes.data.reduce((acc, { tipo_alerta }) => {
                                 const tipoBase = tipo_alerta.startsWith('Combustível não mapeado') ? 'Combustível não mapeado' : tipo_alerta;
                                 acc[tipoBase] = (acc[tipoBase] || 0) + 1;
@@ -790,7 +805,12 @@
                                 datasets: [{
                                     label: 'Tipos de Alerta',
                                     data: Object.values(byTypeProcessed),
-                                    backgroundColor: ['rgb(239, 68, 68)', 'rgb(234, 179, 8)', 'rgb(59, 130, 246)', 'rgb(139, 92, 246)'],
+                                    backgroundColor: [
+                                        `rgb(${priorityColors.Média.rgb})`, 
+                                        `rgb(${priorityColors.Alta.rgb})`, 
+                                        `rgb(${priorityColors.Baixa.rgb})`,
+                                        'rgb(107, 114, 128)' // Cor para outros tipos
+                                    ],
                                     hoverOffset: 4
                                 }]
                             }}));
@@ -804,6 +824,13 @@
 
                     fetchData();
                 }, [showToast]);
+
+                const handleChartClick = (clickedLabel) => {
+                    // Por enquanto, esta função não faz nada, mas está pronta para o futuro filtro
+                    console.log("Clicou em:", clickedLabel);
+                    // Futuramente: setCurrentPage('alertas', { filtro: clickedLabel });
+                    showToast(`Funcionalidade de filtro por clique em '${clickedLabel}' em desenvolvimento.`, "info");
+                };
 
                 const Card = ({ prioridade, cor, quantidade }) => (
                     React.createElement('div', { 
@@ -826,9 +853,9 @@
                     React.createElement('h2', { className: "text-3xl font-bold text-gray-800 mb-2" }, `Olá, ${user.nome}!`),
                     React.createElement('p', { className: "text-gray-600 mb-8" }, "Este é o resumo atual do seu sistema."),
                     React.createElement('div', { className: 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8' },
-                        React.createElement(Card, { prioridade: 'Alta', cor: 'border-red-500', quantidade: stats.Alta }),
-                        React.createElement(Card, { prioridade: 'Média', cor: 'border-yellow-500', quantidade: stats.Média }),
-                        React.createElement(Card, { prioridade: 'Baixa', cor: 'border-blue-500', quantidade: stats.Baixa }),
+                        React.createElement(Card, { prioridade: 'Alta', cor: priorityColors.Alta.border, quantidade: stats.Alta }),
+                        React.createElement(Card, { prioridade: 'Média', cor: priorityColors.Média.border, quantidade: stats.Média }),
+                        React.createElement(Card, { prioridade: 'Baixa', cor: priorityColors.Baixa.border, quantidade: stats.Baixa }),
                         React.createElement('div', { 
                             className: `bg-gray-800 text-white p-6 rounded-xl shadow-lg cursor-pointer hover:shadow-xl transition-shadow`,
                             onClick: () => setCurrentPage('alertas')
@@ -837,11 +864,10 @@
                             React.createElement('p', { className: 'text-4xl font-bold mt-2' }, isLoading ? '...' : stats.total)
                         )
                     ),
-                    // Seção de Gráficos
                     React.createElement('div', { className: 'grid grid-cols-1 lg:grid-cols-3 gap-6' },
                         React.createElement('div', { className: 'lg:col-span-2' },
                             React.createElement(ChartContainer, { title: 'Alertas Gerados vs. Concluídos por Período' },
-                                isLoading || !chartData.overTime ? React.createElement('p', null, 'Carregando...') :
+                                isLoading || !chartData.overTime ? React.createElement('p', { className: 'text-center pt-10' }, 'Carregando...') :
                                 React.createElement(ChartComponent, { 
                                     chartId: 'overTimeChart', 
                                     type: 'line', 
@@ -851,12 +877,32 @@
                             )
                         ),
                         React.createElement(ChartContainer, { title: 'Tipos de Alertas Pendentes' },
-                            isLoading || !chartData.byType ? React.createElement('p', null, 'Carregando...') :
+                            isLoading || !chartData.byType ? React.createElement('p', { className: 'text-center pt-10' }, 'Carregando...') :
                             React.createElement(ChartComponent, {
                                 chartId: 'byTypeChart',
                                 type: 'doughnut',
                                 data: chartData.byType,
-                                options: { maintainAspectRatio: false, responsive: true }
+                                options: { 
+                                    maintainAspectRatio: false, 
+                                    responsive: true,
+                                    plugins: {
+                                        tooltip: {
+                                            callbacks: {
+                                                label: function(context) {
+                                                    let label = context.label || '';
+                                                    if (label) {
+                                                        label += ': ';
+                                                    }
+                                                    const value = context.parsed;
+                                                    const sum = context.dataset.data.reduce((a, b) => a + b, 0);
+                                                    const percentage = sum > 0 ? ((value / sum) * 100).toFixed(1) + '%' : '0%';
+                                                    return `${label}${value} (${percentage})`;
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                onClick: handleChartClick
                             })
                         )
                     )
