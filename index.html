@@ -557,7 +557,7 @@ function ShellAbastecimentos({ user, showToast }) {
                             const json = XLSX.utils.sheet_to_json(worksheet);
                             const dataToInsert = json
                                 .filter(row => row['Status'] && row['Status'].toLowerCase() === 'sucesso')
-                                .filter(row => row['CNPJ do posto'] !== "07015016000117")
+                                .filter(row => row['CNPJ'] !== "07015016000117")
                                 .map(row => {
                                     const transacaoDate = row['Data/Hora transação'];
                                     let finalDate = null;
@@ -566,7 +566,7 @@ function ShellAbastecimentos({ user, showToast }) {
                                         if (!isNaN(d.getTime())) { finalDate = d.toISOString(); }
                                     }
                                     return {
-                                        cnpj: row['CNPJ do posto'],
+                                        cnpj: row['CNPJ'],
                                         status: row['Status'],
                                         data_hora_transacao: finalDate,
                                         cidade: row['Cidade do posto'],
@@ -642,7 +642,7 @@ function ShellAbastecimentos({ user, showToast }) {
                             React.createElement(DateRangePicker, { onDatesChange: (dates) => { setFilters(prev => ({...prev, data_inicio: dates[0] || null, data_fim: dates[1] || null })); } })
                         ),
                         React.createElement('div', null, React.createElement('label', { className: "block text-sm font-medium" }, "Placa"), React.createElement('input', { type: "text", name: "placa", value: filters.placa, onChange: handleFilterChange, className: "mt-1 w-full p-2 border rounded" })),
-                        React.createElement('div', null, React.createElement('label', { className: "block text-sm font-medium" }, "CNPJ do Posto"), React.createElement('input', { type: "text", name: "cnpj", value: filters.cnpj, onChange: handleFilterChange, className: "mt-1 w-full p-2 border rounded" })),
+                        React.createElement('div', null, React.createElement('label', { className: "block text-sm font-medium" }, "CNPJ"), React.createElement('input', { type: "text", name: "cnpj", value: filters.cnpj, onChange: handleFilterChange, className: "mt-1 w-full p-2 border rounded" })),
                         React.createElement('button', { onClick: handleSearch, disabled: isLoading, className: "w-full p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition lg:col-start-4" }, 'Buscar')
                     ),
                     React.createElement('div', { className: "rounded-lg border border-slate-200 shadow-sm overflow-hidden" },
