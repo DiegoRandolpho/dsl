@@ -720,44 +720,88 @@
                 );
             }
             function Dashboard({ user, showToast, setCurrentPage }) {
-                const [alertCounts, setAlertCounts] = React.useState({ Alta: 0, Média: 0, Baixa: 0, total: 0 });
+                const [stats, setStats] = React.useState({ Alta: 0, Média: 0, Baixa: 0, total: 0 });
+                const [chartData, setChartData] = React.useState({ overTime: null, byType: null });
                 const [isLoading, setIsLoading] = React.useState(true);
 
+                // Componente reutilizável para renderizar os gráficos
+                const ChartComponent = ({ chartId, type, data, options }) => {
+                    const canvasRef = React.useRef(null);
+                    React.useEffect(() => {
+                        if (!canvasRef.current || !data) return;
+                        const chart = new Chart(canvasRef.current, { type, data, options });
+                        return () => chart.destroy(); // Limpa o gráfico ao desmontar
+                    }, [data, type, options]);
+                    return React.createElement('canvas', { ref: canvasRef, id: chartId });
+                };
+
                 React.useEffect(() => {
-                    const fetchAlertCounts = async () => {
+                    const fetchData = async () => {
                         setIsLoading(true);
                         try {
-                            const { data, error } = await supabase
-                                .from('alertas')
-                                .select(`
-                                    id,
-                                    alerta_prioridades ( prioridade )
-                                `)
-                                .eq('status', 'pendente');
-
-                            if (error) throw error;
+                            // Usamos Promise.all para buscar dados para os cards e gráficos em paralelo
+                            const [countsRes, overTimeRes, byTypeRes] = await Promise.all([
+                                // Query para os cards de contagem
+                                supabase.from('alertas').select('alerta_prioridades(prioridade)').eq('status', 'pendente'),
+                                // Query para o gráfico de linha (agrupado por período)
+                                supabase.from('alertas').select('periodo, status').order('periodo', { ascending: true }),
+                                // Query para o gráfico de pizza (agrupado por tipo)
+                                supabase.from('alertas').select('tipo_alerta').eq('status', 'pendente')
+                            ]);
                             
-                            const counts = data.reduce((acc, alerta) => {
+                            if (countsRes.error || overTimeRes.error || byTypeRes.error) throw new Error("Falha ao buscar dados para o dashboard.");
+
+                            // 1. Processa dados para os cards de contagem
+                            const counts = countsRes.data.reduce((acc, alerta) => {
                                 const prioridade = alerta.alerta_prioridades?.prioridade || 'N/D';
-                                if (acc[prioridade]) {
-                                    acc[prioridade]++;
-                                } else {
-                                    acc[prioridade] = 1;
-                                }
+                                acc[prioridade] = (acc[prioridade] || 0) + 1;
                                 acc.total++;
                                 return acc;
                             }, { Alta: 0, Média: 0, Baixa: 0, total: 0 });
+                            setStats(counts);
 
-                            setAlertCounts(counts);
+                            // 2. Processa dados para o gráfico de linha (Alertas por Período)
+                            const overTimeProcessed = overTimeRes.data.reduce((acc, { periodo, status }) => {
+                                if (!periodo) return acc;
+                                acc[periodo] = acc[periodo] || { pendente: 0, concluido: 0 };
+                                if (status === 'pendente') acc[periodo].pendente++;
+                                if (status === 'concluido') acc[periodo].concluido++;
+                                return acc;
+                            }, {});
+                            const overTimeLabels = Object.keys(overTimeProcessed);
+                            setChartData(prev => ({ ...prev, overTime: {
+                                labels: overTimeLabels,
+                                datasets: [
+                                    { label: 'Pendentes', data: overTimeLabels.map(p => overTimeProcessed[p].pendente), borderColor: 'rgb(234, 179, 8)', backgroundColor: 'rgba(234, 179, 8, 0.5)', tension: 0.1 },
+                                    { label: 'Concluídos', data: overTimeLabels.map(p => overTimeProcessed[p].concluido), borderColor: 'rgb(34, 197, 94)', backgroundColor: 'rgba(34, 197, 94, 0.5)', tension: 0.1 }
+                                ]
+                            }}));
+
+                            // 3. Processa dados para o gráfico de pizza (Alertas por Tipo)
+                            const byTypeProcessed = byTypeRes.data.reduce((acc, { tipo_alerta }) => {
+                                const tipoBase = tipo_alerta.startsWith('Combustível não mapeado') ? 'Combustível não mapeado' : tipo_alerta;
+                                acc[tipoBase] = (acc[tipoBase] || 0) + 1;
+                                return acc;
+                            }, {});
+                            const byTypeLabels = Object.keys(byTypeProcessed);
+                            setChartData(prev => ({ ...prev, byType: {
+                                labels: byTypeLabels,
+                                datasets: [{
+                                    label: 'Tipos de Alerta',
+                                    data: Object.values(byTypeProcessed),
+                                    backgroundColor: ['rgb(239, 68, 68)', 'rgb(234, 179, 8)', 'rgb(59, 130, 246)', 'rgb(139, 92, 246)'],
+                                    hoverOffset: 4
+                                }]
+                            }}));
 
                         } catch (err) {
-                            console.error("Erro ao buscar contagem de alertas:", err);
-                            showToast("Não foi possível carregar o resumo de alertas.", "error");
+                            console.error("Erro ao montar o dashboard:", err);
+                            showToast("Não foi possível carregar os dados do dashboard.", "error");
                         }
                         setIsLoading(false);
                     };
 
-                    fetchAlertCounts();
+                    fetchData();
                 }, [showToast]);
 
                 const Card = ({ prioridade, cor, quantidade }) => (
@@ -769,20 +813,50 @@
                         React.createElement('p', { className: 'text-4xl font-bold text-gray-800 mt-2' }, isLoading ? '...' : quantidade)
                     )
                 );
+                
+                const ChartContainer = ({ title, children }) => (
+                    React.createElement('div', { className: 'bg-white p-6 rounded-xl shadow-lg' },
+                        React.createElement('h3', { className: 'text-lg font-semibold text-gray-800 mb-4' }, title),
+                        React.createElement('div', { className: 'h-64' }, children)
+                    )
+                );
 
                 return React.createElement('div', null,
                     React.createElement('h2', { className: "text-3xl font-bold text-gray-800 mb-2" }, `Olá, ${user.nome}!`),
                     React.createElement('p', { className: "text-gray-600 mb-8" }, "Este é o resumo atual do seu sistema."),
-                    React.createElement('div', { className: 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6' },
-                        React.createElement(Card, { prioridade: 'Alta', cor: 'border-red-500', quantidade: alertCounts.Alta }),
-                        React.createElement(Card, { prioridade: 'Média', cor: 'border-yellow-500', quantidade: alertCounts.Média }),
-                        React.createElement(Card, { prioridade: 'Baixa', cor: 'border-blue-500', quantidade: alertCounts.Baixa }),
+                    React.createElement('div', { className: 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8' },
+                        React.createElement(Card, { prioridade: 'Alta', cor: 'border-red-500', quantidade: stats.Alta }),
+                        React.createElement(Card, { prioridade: 'Média', cor: 'border-yellow-500', quantidade: stats.Média }),
+                        React.createElement(Card, { prioridade: 'Baixa', cor: 'border-blue-500', quantidade: stats.Baixa }),
                         React.createElement('div', { 
                             className: `bg-gray-800 text-white p-6 rounded-xl shadow-lg cursor-pointer hover:shadow-xl transition-shadow`,
                             onClick: () => setCurrentPage('alertas')
                         },
                             React.createElement('p', { className: 'text-sm font-medium text-gray-300' }, `Total de Alertas Pendentes`),
-                            React.createElement('p', { className: 'text-4xl font-bold mt-2' }, isLoading ? '...' : alertCounts.total)
+                            React.createElement('p', { className: 'text-4xl font-bold mt-2' }, isLoading ? '...' : stats.total)
+                        )
+                    ),
+                    // Seção de Gráficos
+                    React.createElement('div', { className: 'grid grid-cols-1 lg:grid-cols-3 gap-6' },
+                        React.createElement('div', { className: 'lg:col-span-2' },
+                            React.createElement(ChartContainer, { title: 'Alertas Gerados vs. Concluídos por Período' },
+                                isLoading || !chartData.overTime ? React.createElement('p', null, 'Carregando...') :
+                                React.createElement(ChartComponent, { 
+                                    chartId: 'overTimeChart', 
+                                    type: 'line', 
+                                    data: chartData.overTime,
+                                    options: { maintainAspectRatio: false, responsive: true }
+                                })
+                            )
+                        ),
+                        React.createElement(ChartContainer, { title: 'Tipos de Alertas Pendentes' },
+                            isLoading || !chartData.byType ? React.createElement('p', null, 'Carregando...') :
+                            React.createElement(ChartComponent, {
+                                chartId: 'byTypeChart',
+                                type: 'doughnut',
+                                data: chartData.byType,
+                                options: { maintainAspectRatio: false, responsive: true }
+                            })
                         )
                     )
                 );
