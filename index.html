@@ -73,93 +73,76 @@
             // 2. COMPONENTES AUXILIARES (Helpers)
             // ================================================================
 
-            async function gerarAlertasEmLote(dadosImportados, plataformaAtual) {
+            async function gerarAlertasEmLote(dadosImportados, plataformaAtual, combustivelMap) {
                 if (!dadosImportados || dadosImportados.length === 0) return;
 
                 console.log("Iniciando geração de alertas em lote...");
                 const novosAlertas = [];
                 
-                // Mapeia os dados para um formato comum
                 const dadosMapeados = dadosImportados.map(item => ({
                     placa: item.placa,
-                    data: new Date(plataformaAtual === 'ticket' ? item.data_transacao : item.data_hora_transacao)
+                    data: new Date(item.data),
+                    combustivelOriginal: item.combustivelOriginal
                 }));
 
                 const placasUnicas = [...new Set(dadosMapeados.map(d => d.placa).filter(Boolean))];
                 if (placasUnicas.length === 0) return;
 
-                // --- Verificação 1: Placas não encontradas na base externa ---
+                // --- Verificações em lote ---
                 const tipoAlertaPlacaNaoEncontrada = 'Placa não encontrada na base de equipamentos';
-                
-                // Busca placas que JÁ existem na base externa
-                const { data: placasExternasExistentes, error: placasExternasError } = await supabaseProjeto2
-                    .from('equipamentos')
-                    .select('plate')
-                    .in('plate', placasUnicas);
-                
-                if (placasExternasError) throw placasExternasError;
-
-                const setPlacasExternas = new Set(placasExternasExistentes.map(p => p.plate));
-                const placasNaoEncontradas = placasUnicas.filter(p => !setPlacasExternas.has(p));
-                
-                // --- Verificação 2: Abastecimento em 2 plataformas ---
                 const tipoAlertaDuplicidade = 'Abastecimento em 2 plataformas';
+                const tipoAlertaCombustivel = 'Combustível não mapeado (DE/PARA)';
                 const periodosUnicos = [...new Set(dadosMapeados.map(d => d.data.toLocaleDateString('pt-BR', { month: '2-digit', year: 'numeric' })))];
+
+                const [
+                    { data: placasExternasExistentes },
+                    { data: abastecimentosOutraPlataforma },
+                    { data: alertasJaExistentes }
+                ] = await Promise.all([
+                    supabaseProjeto2.from('equipamentos').select('plate').in('plate', placasUnicas),
+                    supabase.from(plataformaAtual === 'ticket' ? 'shell_abastecimentos' : 'ticket_abastecimentos').select('placa').in('placa', placasUnicas).gte(plataformaAtual === 'ticket' ? 'data_hora_transacao' : 'data_transacao', new Date(dadosMapeados[0].data.getFullYear(), dadosMapeados[0].data.getMonth(), 1).toISOString()).lte(plataformaAtual === 'ticket' ? 'data_hora_transacao' : 'data_transacao', new Date(dadosMapeados[0].data.getFullYear(), dadosMapeados[0].data.getMonth() + 1, 0, 23, 59, 59).toISOString()),
+                    supabase.from('alertas').select('placa, periodo, tipo_alerta').in('placa', placasUnicas).in('periodo', periodosUnicos).in('tipo_alerta', [tipoAlertaPlacaNaoEncontrada, tipoAlertaDuplicidade, tipoAlertaCombustivel])
+                ]);
                 
-                // Pega todos os abastecimentos da outra plataforma para as placas e períodos relevantes
-                const tabelaOutraPlataforma = plataformaAtual === 'ticket' ? 'shell_abastecimentos' : 'ticket_abastecimentos';
-                const colunaDataOutraPlataforma = plataformaAtual === 'ticket' ? 'data_hora_transacao' : 'data_transacao';
-                
-                const primeiroDiaMes = new Date(dadosMapeados[0].data.getFullYear(), dadosMapeados[0].data.getMonth(), 1);
-                const ultimoDiaMes = new Date(dadosMapeados[0].data.getFullYear(), dadosMapeados[0].data.getMonth() + 1, 0, 23, 59, 59);
+                // --- Lógica de comparação ---
+                const setPlacasExternas = new Set(placasExternasExistentes?.map(p => p.plate));
+                const setPlacasOutraPlataforma = new Set(abastecimentosOutraPlataforma?.map(a => a.placa));
+                const setAlertasExistentes = new Set(alertasJaExistentes?.map(a => `${a.placa}-${a.periodo}-${a.tipo_alerta}`));
 
-                const { data: abastecimentosOutraPlataforma, error: outraPlataformaError } = await supabase
-                    .from(tabelaOutraPlataforma)
-                    .select('placa')
-                    .in('placa', placasUnicas)
-                    .gte(colunaDataOutraPlataforma, primeiroDiaMes.toISOString())
-                    .lte(colunaDataOutraPlataforma, ultimoDiaMes.toISOString());
-
-                if(outraPlataformaError) throw outraPlataformaError;
-
-                const setPlacasOutraPlataforma = new Set(abastecimentosOutraPlataforma.map(a => a.placa));
-
-                // --- Consolidação e Prevenção de Duplicatas ---
-                // Busca todos os alertas já existentes para as placas e tipos que vamos verificar
-                const { data: alertasJaExistentes, error: alertasExistentesError } = await supabase
-                    .from('alertas')
-                    .select('placa, periodo, tipo_alerta')
-                    .in('placa', placasUnicas)
-                    .in('periodo', periodosUnicos)
-                    .in('tipo_alerta', [tipoAlertaPlacaNaoEncontrada, tipoAlertaDuplicidade]);
-                
-                if (alertasExistentesError) throw alertasExistentesError;
-                const setAlertasExistentes = new Set(alertasJaExistentes.map(a => `${a.placa}-${a.periodo}-${a.tipo_alerta}`));
-
-                // Agora, cria os novos alertas
                 for (const item of dadosMapeados) {
+                    if (!item.placa || !item.data) continue;
                     const periodo = item.data.toLocaleDateString('pt-BR', { month: '2-digit', year: 'numeric' });
 
-                    // Checa se deve criar alerta de placa não encontrada
-                    if (placasNaoEncontradas.includes(item.placa)) {
+                    // Alerta 1: Placa não encontrada na base externa
+                    if (!setPlacasExternas.has(item.placa)) {
                         const chave = `${item.placa}-${periodo}-${tipoAlertaPlacaNaoEncontrada}`;
                         if (!setAlertasExistentes.has(chave)) {
                             novosAlertas.push({ placa: item.placa, periodo, tipo_alerta: tipoAlertaPlacaNaoEncontrada, status: 'pendente' });
-                            setAlertasExistentes.add(chave); // Evita adicionar de novo no mesmo lote
+                            setAlertasExistentes.add(chave);
                         }
                     }
                     
-                    // Checa se deve criar alerta de duplicidade de plataforma
+                    // Alerta 2: Abastecimento em 2 plataformas
                     if (setPlacasOutraPlataforma.has(item.placa)) {
                          const chave = `${item.placa}-${periodo}-${tipoAlertaDuplicidade}`;
                          if (!setAlertasExistentes.has(chave)) {
                             novosAlertas.push({ placa: item.placa, periodo, tipo_alerta: tipoAlertaDuplicidade, status: 'pendente' });
-                            setAlertasExistentes.add(chave); // Evita adicionar de novo no mesmo lote
+                            setAlertasExistentes.add(chave);
                          }
+                    }
+
+                    // Alerta 3: Combustível não mapeado
+                    if (item.combustivelOriginal && !combustivelMap.has(item.combustivelOriginal)) {
+                        const tipoAlerta = `Combustível não mapeado: ${item.combustivelOriginal}`;
+                        const chave = `${item.placa}-${periodo}-${tipoAlerta}`; // Chave dinâmica para evitar duplicatas do mesmo combustível
+                        if (!setAlertasExistentes.has(chave)) {
+                            novosAlertas.push({ placa: item.placa, periodo, tipo_alerta: tipoAlerta, status: 'pendente' });
+                            setAlertasExistentes.add(chave);
+                        }
                     }
                 }
 
-                // Insere todos os novos alertas de uma vez
+                // --- Insere os novos alertas ---
                 if (novosAlertas.length > 0) {
                     console.log(`Inserindo ${novosAlertas.length} novos alertas...`);
                     const { error: insertError } = await supabase.from('alertas').insert(novosAlertas);
@@ -167,7 +150,6 @@
                 }
                 console.log("Geração de alertas em lote concluída.");
             }
-
             function LucideIcon({ name, className }) {
                 return React.createElement('span', {
                     className: className,
