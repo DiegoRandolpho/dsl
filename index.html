@@ -93,7 +93,7 @@
 
                 const tipoAlertaPlacaNaoEncontrada = 'Placa não encontrada na base de equipamentos';
                 const tipoAlertaDuplicidade = 'Abastecimento em 2 plataformas';
-                const tipoAlertaCombustivel = 'Combustível não mapeado'; // <- Usaremos sempre o valor genérico
+                const tipoAlertaCombustivel = 'Combustível não mapeado'; // Usaremos sempre o valor genérico
                 const periodosUnicos = [...new Set(dadosMapeados.map(d => d.data.toLocaleDateString('pt-BR', { month: '2-digit', year: 'numeric' })))];
 
                 const [
@@ -130,16 +130,14 @@
                          }
                     }
 
-                    // *** AJUSTE PRINCIPAL AQUI ***
                     if (item.combustivelOriginal && !combustivelMap.has(item.combustivelOriginal)) {
                         const chave = `${item.placa}-${periodo}-${tipoAlertaCombustivel}`;
                         if (!setAlertasExistentes.has(chave)) {
-                            // O 'tipo_alerta' é genérico, e o combustível específico vai para a nova coluna 'detalhes'
                             novosAlertas.push({ 
                                 placa: item.placa, 
                                 periodo, 
                                 tipo_alerta: tipoAlertaCombustivel, 
-                                detalhes: item.combustivelOriginal, // <-- NOVO CAMPO
+                                detalhes: item.combustivelOriginal, // <-- Salva o nome específico aqui
                                 status: 'pendente' 
                             });
                             setAlertasExistentes.add(chave);
@@ -355,7 +353,7 @@
                         
                         const prioridadesMap = new Map();
                         const alertasComPrioridade = alertasData.map(a => {
-                            const tipoBase = a.tipo_alerta.startsWith('Combustível não mapeado:') ? 'Combustível não mapeado' : a.tipo_alerta;
+                            const tipoBase = a.tipo_alerta.startsWith('Combustível não mapeado') ? 'Combustível não mapeado' : a.tipo_alerta;
                             const p = a.alerta_prioridades;
                             if (p && !prioridadesMap.has(tipoBase)) {
                                 prioridadesMap.set(tipoBase, { prioridade: p.prioridade, cor: p.cor_badge });
