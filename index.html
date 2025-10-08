@@ -1445,7 +1445,12 @@ function ShellAbastecimentos({ user, showToast }) {
 
                 React.useEffect(() => {
                     const fetchTanqueOptions = async () => {
-                        const { data, error } = await supabase.from('filiais').select('centro_de_custo_final');
+                        // AJUSTE AQUI: Adicionado o filtro .not('cta_cod_posto', 'is', null)
+                        const { data, error } = await supabase
+                            .from('filiais')
+                            .select('centro_de_custo_final')
+                            .not('cta_cod_posto', 'is', null); // <-- SÓ PEGA FILIAIS COM POSTO INTERNO
+
                         if (error) {
                             showToast("Erro ao carregar opções de tanque.", "error");
                         } else {
@@ -1455,13 +1460,16 @@ function ShellAbastecimentos({ user, showToast }) {
                     };
                     fetchTanqueOptions();
                 }, [showToast]);
+
                 const formatDate = (dateString) => {
                     if (!dateString) return '—';
                     const date = new Date(dateString.includes('T') ? dateString : dateString + 'T00:00:00');
                     return date.toLocaleDateString('pt-BR');
                 };
+
                 const handleFilterChange = (e) => { setFilters(prev => ({ ...prev, [e.target.name]: e.target.value })); };
                 const handleInputChange = (e) => { setFormData(prev => ({ ...prev, [e.target.name]: e.target.value })); };
+                
                 const handleSearch = async () => {
                     setHasSearched(true);
                     setIsLoading(true);
@@ -1485,14 +1493,37 @@ function ShellAbastecimentos({ user, showToast }) {
                     }
                     setIsLoading(false);
                 };
+
                 const handleFormSubmit = async (e) => {
                     e.preventDefault();
                     setIsLoading(true);
                     try {
-                        const recordToInsert = { ...formData, volume_balde: parseFloat(formData.volume_balde) || 0, volume_cta: parseFloat(formData.volume_cta) || 0, volume_bomba: parseFloat(formData.volume_bomba) || 0, usuario_criacao: user.nome, };
-                        const { error } = await supabase.from('afericoes').insert([recordToInsert]);
-                        if (error) throw error;
+                        // 1. Insere a nova aferição
+                        const recordToInsert = { ...formData, volume_balde: parseFloat(formData.volume_balde) || 0, volume_cta: parseFloat(formData.volume_cta) || 0, volume_bomba: parseFloat(formData.volume_bomba) || 0, usuario_criacao: user.nome };
+                        const { error: insertError } = await supabase.from('afericoes').insert([recordToInsert]);
+                        if (insertError) throw insertError;
+
                         showToast("Aferição registrada com sucesso!", "success");
+
+                        // 2. LÓGICA PARA CONCLUIR O ALERTA AUTOMATICAMENTE
+                        if (formData.tanque && formData.data_afericao) {
+                            const dataObj = new Date(formData.data_afericao + 'T12:00:00'); // Adiciona hora para evitar problemas de fuso
+                            const periodo = dataObj.toLocaleDateString('pt-BR', { month: '2-digit', year: 'numeric' });
+
+                            await supabase
+                                .from('alertas')
+                                .update({
+                                    status: 'concluido',
+                                    observacao: `Aferição registrada em ${dataObj.toLocaleDateString('pt-BR')}. Concluído automaticamente.`,
+                                    usuario_conclusao: 'Sistema',
+                                    data_conclusao: new Date().toISOString()
+                                })
+                                .eq('placa', formData.tanque) // Na tabela de alertas, o tanque é salvo como 'placa'
+                                .eq('periodo', periodo)
+                                .eq('tipo_alerta', 'Aferição não realizada')
+                                .eq('status', 'pendente');
+                        }
+
                         setFormData(initialFormState);
                         setShowForm(false);
                         setHasSearched(false);
@@ -1502,6 +1533,8 @@ function ShellAbastecimentos({ user, showToast }) {
                     }
                     setIsLoading(false);
                 };
+
+                // O restante da função (o return com o JSX) continua o mesmo
                 return React.createElement('div', { className: "bg-white p-6 rounded-xl shadow-lg" },
                     React.createElement('h2', { className: "text-2xl font-bold text-gray-800 mb-6 text-center" }, "Aferições de Tanques"),
                     !showForm && React.createElement('div', { className: 'flex justify-center mb-6' },
@@ -1509,7 +1542,7 @@ function ShellAbastecimentos({ user, showToast }) {
                     ),
                     showForm && React.createElement('form', { onSubmit: handleFormSubmit, className: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8 p-4 border rounded-lg bg-gray-50" },
                         React.createElement('select', { name: "tanque", value: formData.tanque, onChange: handleInputChange, className: "p-2 border rounded", required: true }, React.createElement('option', { value: '' }, 'Selecione o Tanque*'), opcoesTanque.map(t => React.createElement('option', { key: t, value: t }, t))),
-                        React.createElement('input', { name: "data_afericao", type: "date", value: formData.data_afericao, onChange: handleInputChange, className: "p-2 border rounded" }),
+                        React.createElement('input', { name: "data_afericao", type: "date", value: formData.data_afericao, onChange: handleInputChange, className: "p-2 border rounded", required: true }),
                         React.createElement('input', { name: "volume_balde", type: "number", step: "0.01", value: formData.volume_balde, onChange: handleInputChange, placeholder: "Volume Balde (ml)", className: "p-2 border rounded" }),
                         React.createElement('input', { name: "volume_cta", type: "number", step: "0.01", value: formData.volume_cta, onChange: handleInputChange, placeholder: "Volume CTA (L)", className: "p-2 border rounded" }),
                         React.createElement('input', { name: "volume_bomba", type: "number", step: "0.01", value: formData.volume_bomba, onChange: handleInputChange, placeholder: "Volume Bomba (L)", className: "p-2 border rounded" }),
@@ -1518,11 +1551,7 @@ function ShellAbastecimentos({ user, showToast }) {
                     ),
                     React.createElement('div', { className: "mb-6 p-4 border rounded-lg bg-gray-50 grid grid-cols-1 md:grid-cols-3 gap-4 items-end" },
                         React.createElement('div', { className: "md:col-span-2" },
-                            React.createElement(DateRangePicker, {
-                                onDatesChange: (dates) => {
-                                    setFilters(prev => ({ ...prev, data_inicio: dates[0] || null, data_fim: dates[1] || null }));
-                                }
-                            })
+                            React.createElement(DateRangePicker, { onDatesChange: (dates) => { setFilters(prev => ({ ...prev, data_inicio: dates[0] || null, data_fim: dates[1] || null })); } })
                         ),
                         React.createElement('div', null, React.createElement('label', { className: "block text-sm font-medium" }, "Tanque"), React.createElement('input', { type: "text", name: "tanque", value: filters.tanque, onChange: handleFilterChange, className: "mt-1 w-full p-2 border rounded" })),
                         React.createElement('button', { onClick: handleSearch, disabled: isLoading, className: "w-full p-2 bg-blue-600 text-white rounded-lg md:col-start-3" }, 'Buscar')
