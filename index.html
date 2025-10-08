@@ -938,7 +938,14 @@
                             const sheetName = workbook.SheetNames[0];
                             const worksheet = workbook.Sheets[sheetName];
                             const json = XLSX.utils.sheet_to_json(worksheet);
-                            const dataToInsert = json.slice(0, -1).map(row => {
+                            
+                            // Coleta o nome original do combustível ANTES de padronizar
+                            const dataToProcess = json.slice(0, -1).map(row => ({
+                                raw: row,
+                                combustivelOriginal: row['TIPO COMBUSTIVEL']
+                            }));
+
+                            const dataToInsert = dataToProcess.map(({ raw: row, combustivelOriginal }) => {
                                 const transacaoDate = row['DATA TRANSACAO'];
                                 let finalDate = null;
                                 if (transacaoDate) {
@@ -953,8 +960,7 @@
                                         finalDate = `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
                                     }
                                 }
-                                const originalCombustivel = row['TIPO COMBUSTIVEL'];
-                                const padronizadoCombustivel = combustivelMap.get(originalCombustivel) || originalCombustivel;
+                                const padronizadoCombustivel = combustivelMap.get(combustivelOriginal) || combustivelOriginal;
                                 return {
                                     codigo_transacao: row['CODIGO TRANSACAO'],
                                     servico: row['SERVICO'],
@@ -980,30 +986,22 @@
                                 return;
                             }
                             
-                            // 1. Insere os abastecimentos no banco de dados
                             const { error } = await supabase.from('ticket_abastecimentos').insert(dataToInsert, { returning: 'minimal' });
-                            if (error) throw error;
-                            
+                            if (error) { console.error("Erro do Supabase:", error); throw error; }
+
                             showToast(`${dataToInsert.length} registros importados! Sincronizando alertas...`, "success");
 
-                            // **INÍCIO DA OTIMIZAÇÃO DE PERFORMANCE**
-                            // 2. Cria uma lista de promessas para todas as verificações de alerta
-                            const alertCheckPromises = [];
-                            for (const item of dataToInsert) {
-                                if (item.placa && item.data_transacao) {
-                                    const periodo = new Date(item.data_transacao).toLocaleDateString('pt-BR', { month: '2-digit', year: 'numeric' });
-                                    // Adiciona as verificações à lista SEM o 'await'
-                                    alertCheckPromises.push(verificarExistenciaPlacaExterna(item.placa, periodo));
-                                    alertCheckPromises.push(verificarDuplicidadePlataforma(item.placa, item.data_transacao, 'ticket'));
-                                }
-                            }
-                            
-                            // 3. Executa todas as verificações em paralelo
-                            await Promise.all(alertCheckPromises);
-                            console.log("Sincronização de alertas finalizada.");
-                            // **FIM DA OTIMIZAÇÃO**
+                            // AJUSTE: Passa também o nome original do combustível
+                            const dadosParaAlerta = dataToInsert.map((item, index) => ({ 
+                                placa: item.placa, 
+                                data: item.data_transacao, 
+                                combustivelOriginal: dataToProcess[index].combustivelOriginal 
+                            }));
+                            gerarAlertasEmLote(dadosParaAlerta, 'ticket', combustivelMap).catch(err => {
+                                console.error("Erro ao gerar alertas em lote para Ticket:", err);
+                                showToast("Erro ao gerar alertas.", "error");
+                            });
 
-                            // Limpa a interface
                             setFile(null); 
                             document.getElementById('file-input-ticket').value = '';
                             setHasSearched(false);
@@ -1077,6 +1075,22 @@
                 const [isImporting, setIsImporting] = React.useState(false);
                 const [filters, setFilters] = React.useState({ placa: '', data_inicio: null, data_fim: null, cnpj: '' });
                 const [hasSearched, setHasSearched] = React.useState(false);
+                
+                // LÓGICA ADICIONADA: Carrega o mapa de combustíveis
+                const [combustivelMap, setCombustivelMap] = React.useState(new Map());
+                React.useEffect(() => {
+                    const fetchMapping = async () => {
+                        const { data, error } = await supabase.from('combustivel_mapeamento').select('nome_original, nome_padronizado');
+                        if (error) {
+                            showToast("Aviso: Não foi possível carregar as regras de mapeamento de combustível.", "error");
+                        } else {
+                            const map = new Map(data.map(rule => [rule.nome_original, rule.nome_padronizado]));
+                            setCombustivelMap(map);
+                        }
+                    };
+                    fetchMapping();
+                }, [showToast]);
+
                 const formatDate = (dateString) => {
                     if (!dateString) return '—';
                     return new Date(dateString).toLocaleString('pt-BR');
@@ -1156,30 +1170,18 @@
                                 return;
                             }
                             
-                            // 1. Insere os abastecimentos no banco de dados
                             const { error } = await supabase.from('shell_abastecimentos').insert(dataToInsert, { returning: 'minimal' });
-                            if (error) throw error;
-
+                            if (error) { console.error("Erro do Supabase:", error); throw error; }
+                            
                             showToast(`${dataToInsert.length} registros importados! Sincronizando alertas...`, "success");
 
-                            // **INÍCIO DA OTIMIZAÇÃO DE PERFORMANCE**
-                            // 2. Cria uma lista de promessas para todas as verificações de alerta
-                            const alertCheckPromises = [];
-                            for (const item of dataToInsert) {
-                                if (item.placa && item.data_hora_transacao) {
-                                    const periodo = new Date(item.data_hora_transacao).toLocaleDateString('pt-BR', { month: '2-digit', year: 'numeric' });
-                                    // Adiciona as verificações à lista SEM o 'await'
-                                    alertCheckPromises.push(verificarExistenciaPlacaExterna(item.placa, periodo));
-                                    alertCheckPromises.push(verificarDuplicidadePlataforma(item.placa, item.data_hora_transacao, 'shell'));
-                                }
-                            }
+                            // AJUSTE: Passa o mapa de combustíveis para a função de alertas
+                            const dadosParaAlerta = dataToInsert.map(item => ({ placa: item.placa, data: item.data_hora_transacao, combustivelOriginal: item.combustivel }));
+                            gerarAlertasEmLote(dadosParaAlerta, 'shell', combustivelMap).catch(err => {
+                                console.error("Erro ao gerar alertas em lote para Shell:", err);
+                                showToast("Erro ao gerar alertas.", "error");
+                            });
 
-                            // 3. Executa todas as verificações em paralelo
-                            await Promise.all(alertCheckPromises);
-                            console.log("Sincronização de alertas finalizada.");
-                            // **FIM DA OTIMIZAÇÃO**
-
-                            // Limpa a interface
                             setFile(null); 
                             document.getElementById('file-input-shell').value = '';
                             setHasSearched(false);
@@ -1191,6 +1193,7 @@
                     };
                     reader.readAsArrayBuffer(file);
                 };
+                // O resto da função (o return com o JSX) continua o mesmo...
                 return React.createElement('div', { className: "bg-white p-6 rounded-xl shadow-lg" },
                     React.createElement('h2', { className: "text-2xl font-bold text-gray-800 mb-6 text-center" }, "Importação Shell"),
                     React.createElement('div', { className: "mb-8 p-4 border rounded-lg bg-gray-100 grid grid-cols-1 md:grid-cols-2 gap-4 items-end" },
