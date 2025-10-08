@@ -2991,7 +2991,7 @@ function ShellAbastecimentos({ user, showToast }) {
             // ================================================================
             // 4. COMPONENTE PRINCIPAL (App)
             // ================================================================
-            function App() {
+           function App() {
                 const [user, setUser] = React.useState(() => {
                     const savedUser = localStorage.getItem('userSession');
                     return savedUser ? JSON.parse(savedUser) : null;
@@ -2999,12 +2999,12 @@ function ShellAbastecimentos({ user, showToast }) {
                 const [currentPage, setCurrentPage] = React.useState('dashboard');
                 const [toast, setToast] = React.useState({ show: false, message: '', type: '' });
                 const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
-                const [openMenu, setOpenMenu] = React.useState('');
+                const [openMenu, setOpenMenu] = React.useState('dashboard'); // <-- Alterado para abrir o dashboard por padrão
                 const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(false);
                 
                 const ctaIconUrl = 'https://ikypygpbdmoxozfmwewr.supabase.co/storage/v1/object/sign/ICONS/CTAICON.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9lMGJiMDk5Zi1jZmE5LTQ5Y2UtYjUwNy0wZmE2ZWZkYWYxOTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJJQ09OUy9DVEFJQ09OLnBuZyIsImlhdCI6MTc1OTg2NTA1OSwiZXhwIjoyMDc1MjI1MDU5fQ.xnv-1nyrxg9XsQxLr7uoUQs2rpgzBeSfWXoX8Y37Y-U';
                 const ticketIconUrl = 'https://ikypygpbdmoxozfmwewr.supabase.co/storage/v1/object/sign/ICONS/TICKET.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9lMGJiMDk5Zi1jZmE5LTQ5Y2UtYjUwNy0wZmE2ZWZkYWYxOTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJJQ09OUy9USUNLRVQucG5nIiwiaWF0IjoxNzU5ODY1MTkzLCJleHAiOjIwNzUyMjUxOTN9.EUaHSgL2RjDC8Dt2XWtibSNhh6NtPy8G-3kFQHDpvQY';
-                const shellIconUrl = 'https://ikypygpbdmoxozfmwewr.supabase.co/storage/v1/object/sign/ICONS/Shell-958x575-1-Photoroom-Photoroom.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9lMGJiMDk5Zi1jZmE5LTQ5Y2UtYjUwNy0wZmE2ZWZkYWYxOTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJJQ09OUy9TaGVsbC05NTh4NTc1LTEtUGhvdG9yb29tLVBob3Rvcm9vbS5wbmciLCJpYXQiOjE3NTk4NjUyMTAsImV4cCI6MjA3NTIyNTIxMH0.gw9lTQcpcCYLyYgX1GP2BsZcT8Hg2o7eCyNO_b8fqM0';
+                const shellIconUrl = 'https://ikypygpbdmoxozfmwewr.supabase.co/storage/v1/object/sign/ICONS/Shell-958x575-1-Photoroom-Photoroom.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9lMGJiMDk5Zi1jZmE5LTQ5Y2UtYjUwNy0wZmE2ZWZkYWYxOTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJJQ09OUy9TaGVsbC05NTh4NTc1LTEtUGhvdG9yb29tLVBob3Rvcm9vbS5wbmciLCJpYXQiOjE3NTk4NjUyMTAsImV4cCI6MjA3NTIyNTIxMH0.gw9lTQcpcCYLyYgXGP2BsZcT8Hg2o7eCyNO_b8fqM0';
 
                 const handleLogin = (userData) => {
                     localStorage.setItem('userSession', JSON.stringify(userData));
@@ -3040,9 +3040,11 @@ function ShellAbastecimentos({ user, showToast }) {
                         case 'shellAbastecimentos': return React.createElement(ShellAbastecimentos, { user, showToast });
                         case 'afericoes': return React.createElement(Afericoes, { user, showToast });
                         case 'alertas': return React.createElement(Alertas, { user, showToast });
+                        case 'analiseCustos': return React.createElement(AnaliseCustos, { user, showToast });
+                        case 'analiseEquipamentos': return React.createElement(AnaliseEquipamentos, { user, showToast });
                         case 'cadastroFiliais': return user.nivel_permissao === 'administrador' ? React.createElement(CadastroFiliais, { user, showToast }) : null;
                         case 'mapeamentoCombustivel': return user.nivel_permissao === 'administrador' ? React.createElement(MapeamentoCombustivel, { user, showToast }) : null;
-                        case 'cadastroAlertas': return user.nivel_permissao === 'administrador' ? React.createElement(CadastroAlertas, { user, showToast }) : null; // <-- NOVA LINHA
+                        case 'cadastroAlertas': return user.nivel_permissao === 'administrador' ? React.createElement(CadastroAlertas, { user, showToast }) : null;
                         case 'userManagement': return React.createElement(UserManagement, { user, showToast });
                         default: return React.createElement(Dashboard, { user, showToast, setCurrentPage: setCurrentPage });
                     }
@@ -3127,21 +3129,25 @@ function ShellAbastecimentos({ user, showToast }) {
                             ),
                             React.createElement('nav', { className: "flex-grow" },
                                 React.createElement('ul', { className: "space-y-2" },
-                                    React.createElement(MenuItem, { page: 'dashboard', icon: 'LayoutDashboard', text: 'Dashboard' }),
+                                    React.createElement(MenuCategory, { title: "Dashboard", icon: "LayoutDashboard", menuKey: "dashboard" },
+                                        React.createElement(MenuItem, { page: 'dashboard', icon: 'FileText', text: 'Controle de Alertas' }),
+                                        React.createElement(MenuItem, { page: 'analiseCustos', icon: 'Beaker', text: 'Análise de Custos' }),
+                                        React.createElement(MenuItem, { page: 'analiseEquipamentos', icon: 'Ship', text: 'Consumo por Equipamento' })
+                                    ),
                                     React.createElement(MenuCategory, { title: "Importação", icon: "PlusCircle", menuKey: "importacao" },
-                                        React.createElement(MenuItem, { page: 'ticketAbastecimentos', icon: ticketIconUrl, text: 'Abastecimentos' }),
-                                        React.createElement(MenuItem, { page: 'ctaAbastecimentos', icon: ctaIconUrl, text: 'Abastecimentos' }),
-                                        React.createElement(MenuItem, { page: 'ctaCarregamentos', icon: ctaIconUrl, text: 'Carregamentos' }),
-                                        React.createElement(MenuItem, { page: 'shellAbastecimentos', icon: shellIconUrl, text: 'Abastecimentos' })
+                                        React.createElement(MenuItem, { page: 'ticketAbastecimentos', icon: ticketIconUrl, text: 'Ticket' }),
+                                        React.createElement(MenuItem, { page: 'ctaAbastecimentos', icon: ctaIconUrl, text: 'CTA - Abastecimentos' }),
+                                        React.createElement(MenuItem, { page: 'ctaCarregamentos', icon: ctaIconUrl, text: 'CTA - Carregamentos' }),
+                                        React.createElement(MenuItem, { page: 'shellAbastecimentos', icon: shellIconUrl, text: 'Shell' })
                                     ),
                                     React.createElement(MenuCategory, { title: "Operacional", icon: "Settings", menuKey: "operacional" },
-                                        React.createElement(MenuItem, { page: 'alertas', icon: 'FileText', text: 'Alertas' }),
-                                        React.createElement(MenuItem, { page: 'afericoes', icon: 'Tank', text: 'Aferições' }),
+                                        React.createElement(MenuItem, { page: 'alertas', icon: 'FileText', text: 'Painel de Alertas' }),
+                                        React.createElement(MenuItem, { page: 'afericoes', icon: 'Tank', text: 'Aferições e Perdas' })
                                     ),
                                     user.nivel_permissao === 'administrador' && React.createElement(MenuCategory, { title: "Cadastros", icon: "FileText", menuKey: "cadastros" },
                                         React.createElement(MenuItem, { page: 'cadastroFiliais', icon: 'Building', text: 'Filiais (DE/PARA)' }),
                                         React.createElement(MenuItem, { page: 'mapeamentoCombustivel', icon: 'Fuel', text: 'DE/PARA Combustível' }),
-                                        React.createElement(MenuItem, { page: 'cadastroAlertas', icon: 'Settings', text: 'Tipos de Alerta' }), // <-- NOVA LINHA
+                                        React.createElement(MenuItem, { page: 'cadastroAlertas', icon: 'Settings', text: 'Tipos de Alerta' }),
                                         React.createElement(MenuItem, { page: 'userManagement', icon: 'Users', text: 'Usuários' })
                                     )
                                 )
