@@ -3166,7 +3166,9 @@ function ShellAbastecimentos({ user, showToast }) {
                         setOpenMenu('');
                     }
                 };
-                
+                window.viewPlacaProfile = (placa) => {
+                    setViewingPlaca(placa);
+                };
                 const renderPage = () => {
                     if (viewingPlaca) {
                         return React.createElement(PerfilVeiculo, { 
@@ -3187,7 +3189,7 @@ function ShellAbastecimentos({ user, showToast }) {
                         case 'alertas': return React.createElement(Alertas, { user, showToast, onViewPlaca: viewPlacaProfile });
                         case 'analiseCustos': return React.createElement(AnaliseCustos, { user, showToast });
                         case 'analiseEquipamentos': return React.createElement(AnaliseEquipamentos, { user, showToast, onViewPlaca: viewPlacaProfile });
-                        case 'analiseGeografica': return React.createElement(AnaliseGeografica, { user, showToast });
+                        case 'analiseGeografica': return React.createElement(AnaliseGeografica, { user, showToast, onViewPlaca: viewPlacaProfile });
                         case 'cadastroFiliais': return user.nivel_permissao === 'administrador' ? React.createElement(CadastroFiliais, { user, showToast }) : null;
                         case 'mapeamentoCombustivel': return user.nivel_permissao === 'administrador' ? React.createElement(MapeamentoCombustivel, { user, showToast }) : null;
                         case 'cadastroAlertas': return user.nivel_permissao === 'administrador' ? React.createElement(CadastroAlertas, { user, showToast }) : null;
