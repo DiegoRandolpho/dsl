@@ -722,8 +722,11 @@
             }
             function AnaliseCustos({ user, showToast }) {
                 const [dados, setDados] = React.useState(null);
-                const [isLoading, setIsLoading] = React.useState(true);
+                const [isLoading, setIsLoading] = React.useState(false);
+                const [periodoA, setPeriodoA] = React.useState(null);
+                const [periodoB, setPeriodoB] = React.useState(null);
 
+                // Componente de Gráfico
                 const ChartComponent = ({ chartId, type, data, options }) => {
                     const canvasRef = React.useRef(null);
                     React.useEffect(() => {
@@ -734,104 +737,119 @@
                     return React.createElement('canvas', { ref: canvasRef, id: chartId });
                 };
 
-                React.useEffect(() => {
-                    const fetchData = async () => {
-                        setIsLoading(true);
-                        try {
-                            const [ticketRes, shellRes, ctaRes] = await Promise.all([
-                                supabase.from('ticket_abastecimentos').select('valor_emissao, litros, data_transacao'),
-                                supabase.from('shell_abastecimentos').select('total_abastecimento, litros, data_hora_transacao'),
-                                supabase.from('cta_abastecimentos').select('custo_total, volume, data_hora_inicio')
-                            ]);
+                const fetchData = async () => {
+                    if (!periodoA || !periodoB) {
+                        showToast("Por favor, selecione ambos os períodos para comparar.", "info");
+                        return;
+                    }
+                    setIsLoading(true);
+                    try {
+                        const [inicioA, fimA] = periodoA;
+                        const [inicioB, fimB] = periodoB;
 
-                            if (ticketRes.error || shellRes.error || ctaRes.error) throw new Error("Falha ao buscar dados de abastecimento.");
+                        const [ticketRes, shellRes, ctaRes] = await Promise.all([
+                            supabase.from('ticket_abastecimentos').select('valor_emissao, litros, data_transacao'),
+                            supabase.from('shell_abastecimentos').select('total_abastecimento, litros, data_hora_transacao'),
+                            supabase.from('cta_abastecimentos').select('custo_total, volume, data_hora_inicio')
+                        ]);
 
-                            const processaDados = (dados, campoValor, campoLitros, campoData) => {
-                                return dados.reduce((acc, item) => {
-                                    const periodo = new Date(item[campoData]).toLocaleDateString('pt-BR', { month: '2-digit', year: 'numeric' });
-                                    if (!periodo || !item[campoValor] || !item[campoLitros]) return acc;
-                                    
-                                    acc.custoTotal = (acc.custoTotal || 0) + item[campoValor];
-                                    acc.volumeTotal = (acc.volumeTotal || 0) + item[campoLitros];
+                        if (ticketRes.error || shellRes.error || ctaRes.error) throw new Error("Falha ao buscar dados de abastecimento.");
 
-                                    const periodoData = acc.periodos[periodo] || { custo: 0, volume: 0 };
-                                    periodoData.custo += item[campoValor];
-                                    periodoData.volume += item[campoLitros];
-                                    acc.periodos[periodo] = periodoData;
+                        const processaPeriodo = (dados, campoValor, campoLitros, campoData, inicio, fim) => {
+                            const fimAjustado = new Date(fim);
+                            fimAjustado.setHours(23, 59, 59);
 
-                                    return acc;
-                                }, { custoTotal: 0, volumeTotal: 0, periodos: {} });
+                            return dados.filter(item => {
+                                const dataItem = new Date(item[campoData]);
+                                return dataItem >= inicio && dataItem <= fimAjustado;
+                            }).reduce((acc, item) => {
+                                acc.custoTotal += item[campoValor] || 0;
+                                acc.volumeTotal += (item[campoLitros] || item.volume) || 0;
+                                return acc;
+                            }, { custoTotal: 0, volumeTotal: 0 });
+                        };
+
+                        const plataformas = ['Ticket', 'Shell', 'CTA'];
+                        const dadosComparativos = plataformas.map(p => {
+                            let res, campos;
+                            if (p === 'Ticket') { res = ticketRes.data; campos = { valor: 'valor_emissao', litros: 'litros', data: 'data_transacao' }; }
+                            else if (p === 'Shell') { res = shellRes.data; campos = { valor: 'total_abastecimento', litros: 'litros', data: 'data_hora_transacao' }; }
+                            else { res = ctaRes.data; campos = { valor: 'custo_total', litros: 'volume', data: 'data_hora_inicio' }; }
+                            
+                            const dadosA = processaPeriodo(res, campos.valor, campos.litros, campos.data, inicioA, fimA);
+                            const dadosB = processaPeriodo(res, campos.valor, campos.litros, campos.data, inicioB, fimB);
+                            
+                            return {
+                                plataforma: p,
+                                periodoA: { ...dadosA, precoMedio: dadosA.custoTotal / dadosA.volumeTotal || 0 },
+                                periodoB: { ...dadosB, precoMedio: dadosB.custoTotal / dadosB.volumeTotal || 0 }
                             };
+                        });
+                        
+                        setDados(dadosComparativos);
+                    } catch (err) {
+                        showToast("Erro ao carregar dados para análise.", "error");
+                    }
+                    setIsLoading(false);
+                };
 
-                            const ticketData = processaDados(ticketRes.data, 'valor_emissao', 'litros', 'data_transacao');
-                            const shellData = processaDados(shellRes.data, 'total_abastecimento', 'litros', 'data_hora_transacao');
-                            const ctaData = processaDados(ctaRes.data, 'custo_total', 'volume', 'data_hora_inicio');
+                const ComparisonCard = ({ title, data }) => {
+                    const variacaoCusto = data.periodoB.custoTotal - data.periodoA.custoTotal;
+                    const variacaoPercentualCusto = data.periodoA.custoTotal > 0 ? (variacaoCusto / data.periodoA.custoTotal) * 100 : 0;
+                    const corCusto = variacaoCusto > 0 ? 'text-red-500' : 'text-green-500';
+                    
+                    const variacaoPreco = data.periodoB.precoMedio - data.periodoA.precoMedio;
+                    const variacaoPercentualPreco = data.periodoA.precoMedio > 0 ? (variacaoPreco / data.periodoA.precoMedio) * 100 : 0;
+                    const corPreco = variacaoPreco > 0 ? 'text-red-500' : 'text-green-500';
 
-                            // Unifica e ordena todos os períodos
-                            const todosPeriodos = [...new Set([...Object.keys(ticketData.periodos), ...Object.keys(shellData.periodos), ...Object.keys(ctaData.periodos)])];
-                            todosPeriodos.sort((a, b) => {
-                                const [mesA, anoA] = a.split('/'); const [mesB, anoB] = b.split('/');
-                                return new Date(anoA, mesA - 1) - new Date(anoB, mesB - 1);
-                            });
-
-                            const chartData = {
-                                labels: todosPeriodos,
-                                datasets: [
-                                    { label: 'Ticket (R$/L)', data: todosPeriodos.map(p => ticketData.periodos[p] ? (ticketData.periodos[p].custo / ticketData.periodos[p].volume) : null), borderColor: 'rgb(234, 179, 8)', backgroundColor: 'rgba(234, 179, 8, 0.5)', tension: 0.1, spanGaps: true },
-                                    { label: 'Shell (R$/L)', data: todosPeriodos.map(p => shellData.periodos[p] ? (shellData.periodos[p].custo / shellData.periodos[p].volume) : null), borderColor: 'rgb(239, 68, 68)', backgroundColor: 'rgba(239, 68, 68, 0.5)', tension: 0.1, spanGaps: true },
-                                    { label: 'CTA (R$/L)', data: todosPeriodos.map(p => ctaData.periodos[p] ? (ctaData.periodos[p].custo / ctaData.periodos[p].volume) : null), borderColor: 'rgb(59, 130, 246)', backgroundColor: 'rgba(59, 130, 246, 0.5)', tension: 0.1, spanGaps: true }
-                                ]
-                            };
-
-                            setDados({ ticketData, shellData, ctaData, chartData });
-
-                        } catch (err) {
-                            showToast("Erro ao carregar dados para análise.", "error");
-                        }
-                        setIsLoading(false);
-                    };
-
-                    fetchData();
-                }, [showToast]);
-
-                const InfoCard = ({ titulo, valor, subtitulo }) => (
-                    React.createElement('div', { className: 'bg-gray-50 p-4 rounded-lg' },
-                        React.createElement('p', { className: 'text-sm font-medium text-gray-500' }, titulo),
-                        React.createElement('p', { className: 'text-2xl font-bold text-gray-800 mt-1' }, valor),
-                        React.createElement('p', { className: 'text-xs text-gray-400' }, subtitulo)
-                    )
-                );
-                
-                if (isLoading) {
-                    return React.createElement('p', null, 'Carregando dados para análise...');
-                }
+                    return React.createElement('div', { className: 'bg-white p-4 rounded-lg shadow-md border' },
+                        React.createElement('h3', { className: 'text-lg font-bold text-gray-800 text-center mb-4' }, title),
+                        React.createElement('div', { className: 'space-y-4' },
+                            React.createElement('div', null,
+                                React.createElement('p', { className: 'text-sm text-gray-500' }, 'Custo Total'),
+                                React.createElement('div', { className: 'flex items-baseline gap-2' },
+                                    React.createElement('p', { className: 'text-xl font-semibold' }, `R$ ${data.periodoB.custoTotal.toFixed(2)}`),
+                                    React.createElement('span', { className: `text-sm font-bold ${corCusto}` }, `${variacaoPercentualCusto.toFixed(1)}%`)
+                                )
+                            ),
+                            React.createElement('div', null,
+                                React.createElement('p', { className: 'text-sm text-gray-500' }, 'Preço Médio / Litro'),
+                                React.createElement('div', { className: 'flex items-baseline gap-2' },
+                                     React.createElement('p', { className: 'text-xl font-semibold' }, `R$ ${data.periodoB.precoMedio.toFixed(3)}`),
+                                     React.createElement('span', { className: `text-sm font-bold ${corPreco}` }, `${variacaoPercentualPreco.toFixed(1)}%`)
+                                )
+                            )
+                        )
+                    );
+                };
 
                 return React.createElement('div', { className: 'bg-white p-6 rounded-xl shadow-lg' },
-                    React.createElement('h2', { className: "text-2xl font-bold text-gray-800 mb-6 text-center" }, "Análise de Custos por Plataforma"),
-                    React.createElement('div', { className: 'grid grid-cols-1 md:grid-cols-3 gap-6 mb-8' },
-                        // Coluna Ticket
-                        React.createElement('div', { className: 'border p-4 rounded-lg' }, 
-                            React.createElement('h3', {className: 'font-bold text-lg mb-4 text-center'}, 'Ticket Log'),
-                            React.createElement(InfoCard, { titulo: 'Custo Total', valor: `R$ ${dados.ticketData.custoTotal.toFixed(2)}`, subtitulo: `${dados.ticketData.volumeTotal.toFixed(2)} L` }),
-                            React.createElement(InfoCard, { titulo: 'Preço Médio', valor: `R$ ${(dados.ticketData.custoTotal / dados.ticketData.volumeTotal || 0).toFixed(3)}`, subtitulo: 'por Litro' })
-                        ),
-                        // Coluna Shell
-                        React.createElement('div', { className: 'border p-4 rounded-lg' }, 
-                            React.createElement('h3', {className: 'font-bold text-lg mb-4 text-center'}, 'Shell Box'),
-                             React.createElement(InfoCard, { titulo: 'Custo Total', valor: `R$ ${dados.shellData.custoTotal.toFixed(2)}`, subtitulo: `${dados.shellData.volumeTotal.toFixed(2)} L` }),
-                            React.createElement(InfoCard, { titulo: 'Preço Médio', valor: `R$ ${(dados.shellData.custoTotal / dados.shellData.volumeTotal || 0).toFixed(3)}`, subtitulo: 'por Litro' })
-                        ),
-                        // Coluna CTA
-                        React.createElement('div', { className: 'border p-4 rounded-lg' }, 
-                            React.createElement('h3', {className: 'font-bold text-lg mb-4 text-center'}, 'CTA'),
-                            React.createElement(InfoCard, { titulo: 'Custo Total', valor: `R$ ${dados.ctaData.custoTotal.toFixed(2)}`, subtitulo: `${dados.ctaData.volumeTotal.toFixed(2)} L` }),
-                            React.createElement(InfoCard, { titulo: 'Preço Médio', valor: `R$ ${(dados.ctaData.custoTotal / dados.ctaData.volumeTotal || 0).toFixed(3)}`, subtitulo: 'por Litro' })
-                        )
+                    React.createElement('h2', { className: "text-2xl font-bold text-gray-800 mb-6 text-center" }, "Análise Comparativa de Custos"),
+                    React.createElement('div', { className: 'grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 p-4 border rounded-lg bg-gray-50 items-end' },
+                        React.createElement('div', null, React.createElement('label', { className: 'block text-sm font-medium mb-1' }, 'Período A (Base)'), React.createElement(DateRangePicker, { onDatesChange: setPeriodoA, placeholder: 'Selecione o período base...' })),
+                        React.createElement('div', null, React.createElement('label', { className: 'block text-sm font-medium mb-1' }, 'Período B (Comparação)'), React.createElement(DateRangePicker, { onDatesChange: setPeriodoB, placeholder: 'Selecione o período a comparar...' })),
+                        React.createElement('button', { onClick: fetchData, disabled: isLoading, className: 'w-full p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400' }, isLoading ? 'Analisando...' : 'Analisar')
                     ),
-                    React.createElement('div', { className: 'bg-white p-6 rounded-xl shadow-lg' },
-                        React.createElement('h3', { className: 'text-lg font-semibold text-gray-800 mb-4' }, 'Evolução do Preço Médio (R$/L) por Período'),
+
+                    !isLoading && dados && React.createElement('div', { className: 'grid grid-cols-1 md:grid-cols-3 gap-6' },
+                        dados.map(d => React.createElement(ComparisonCard, { key: d.plataforma, title: d.plataforma, data: d }))
+                    ),
+                    
+                    !isLoading && dados && React.createElement('div', { className: 'mt-8 bg-white p-6 rounded-xl shadow-lg' },
+                        React.createElement('h3', { className: 'text-lg font-semibold text-gray-800 mb-4' }, 'Comparativo de Preço Médio (R$/L)'),
                         React.createElement('div', { className: 'h-80' },
-                            React.createElement(ChartComponent, { chartId: 'custosChart', type: 'line', data: dados.chartData, options: { maintainAspectRatio: false, responsive: true } })
+                            React.createElement(ChartComponent, { 
+                                chartId: 'comparativoChart', 
+                                type: 'bar', 
+                                data: {
+                                    labels: dados.map(d => d.plataforma),
+                                    datasets: [
+                                        { label: 'Período A', data: dados.map(d => d.periodoA.precoMedio), backgroundColor: 'rgba(156, 163, 175, 0.7)' },
+                                        { label: 'Período B', data: dados.map(d => d.periodoB.precoMedio), backgroundColor: 'rgba(59, 130, 246, 0.7)' }
+                                    ]
+                                }, 
+                                options: { maintainAspectRatio: false, responsive: true } 
+                            })
                         )
                     )
                 );
@@ -1162,12 +1180,12 @@
                 const [currentPage, setCurrentPage] = React.useState('dashboard');
                 const [toast, setToast] = React.useState({ show: false, message: '', type: '' });
                 const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
-                const [openMenu, setOpenMenu] = React.useState('');
+                const [openMenu, setOpenMenu] = React.useState('dashboard');
                 const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(false);
                 
-                const ctaIconUrl = 'https://ikypygpbdmoxozfmwewr.supabase.co/storage/v1/object/sign/ICONS/CTAICON.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9lMGJiMDk5Zi1jZmE5LTQ5Y2UtYjUwNy0wZmE2ZWZkYWYxOTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJJQ09OUy9DVEFJQ09OLnBuZyIsImlhdCI6MTc1OTg2NTA1OSwiZXhwIjoyMDc1MjI1MDU5fQ.xnv-1nyrxg9XsQxLr7uoUQs2rpgzBeSfWXoX8Y37Y-U';
-                const ticketIconUrl = 'https://ikypygpbdmoxozfmwewr.supabase.co/storage/v1/object/sign/ICONS/TICKET.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9lMGJiMDk5Zi1jZmE5LTQ5Y2UtYjUwNy0wZmE2ZWZkYWYxOTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJJQ09OUy9USUNLRVQucG5nIiwiaWF0IjoxNzU5ODY1MTkzLCJleHAiOjIwNzUyMjUxOTN9.EUaHSgL2RjDC8Dt2XWtibSNhh6NtPy8G-3kFQHDpvQY';
-                const shellIconUrl = 'https://ikypygpbdmoxozfmwewr.supabase.co/storage/v1/object/sign/ICONS/Shell-958x575-1-Photoroom-Photoroom.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9lMGJiMDk5Zi1jZmE5LTQ5Y2UtYjUwNy0wZmE2ZWZkYWYxOTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJJQ09OUy9TaGVsbC05NTh4NTc1LTEtUGhvdG9yb29tLVBob3Rvcm9vbS5wbmciLCJpYXQiOjE3NTk5NjQ3ODAsImV4cCI6MjA3NTMyNDc4MH0.h1fb6BAW6lJB5grW4h9VHvcAD7dBmvWKEssa9kflxVs';
+                const ctaIconUrl = 'https://ikypygpbdmoxozfmwewr.supabase.co/storage/v1/object/public/ICONS/CTAICON.png';
+                const ticketIconUrl = 'https://ikypygpbdmoxozfmwewr.supabase.co/storage/v1/object/public/ICONS/TICKET.png';
+                const shellIconUrl = 'https://ikypygpbdmoxozfmwewr.supabase.co/storage/v1/object/public/ICONS/Shell-958x575-1-Photoroom-Photoroom.png';
 
                 const handleLogin = (userData) => {
                     localStorage.setItem('userSession', JSON.stringify(userData));
@@ -1286,7 +1304,7 @@
                         React.createElement('aside', { className: `fixed inset-y-0 left-0 bg-gray-800 text-white p-4 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:relative md:translate-x-0 transition-all duration-300 z-30 flex flex-col ${isSidebarCollapsed ? 'w-24' : 'w-72'}` },
                             React.createElement('div', { className: "flex items-center justify-center mb-8" },
                                 React.createElement('img', { 
-                                    src: "https://ikypygpbdmoxozfmwewr.supabase.co/storage/v1/object/sign/logo/LOGO_TERSYS-removebg-preview%20(1)%20(1).png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9lMGJiMDk5Zi1jZmE5LTQ5Y2UtYjUwNy0wZmE2ZWZkYWYxOTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJsb2dvL0xPR09fVEVSU1lTLXJlbW92ZWJnLXByZXZpZXcgKDEpICgxKS5wbmciLCJpYXQiOjE3NTkyMzU4NTYsImV4cCI6MjA3NDU5NTg1Nn0.R8XPKzBUjrjR3kcJijIvDaCGpGMlvyMKA6lsqiSOcEQ", 
+                                    src: "https://ikypygpbdmoxozfmwewr.supabase.co/storage/v1/object/public/logo/LOGO_TERSYS-removebg-preview%20(1)%20(1).png", 
                                     alt: "Logo", 
                                     className: `cursor-pointer transition-all duration-300 ${isSidebarCollapsed ? 'h-12 w-auto' : 'h-16 w-auto'}`,
                                     onClick: () => setCurrentPage('dashboard') 
@@ -1294,23 +1312,21 @@
                             ),
                             React.createElement('nav', { className: "flex-grow" },
                                 React.createElement('ul', { className: "space-y-2" },
-                                    // *** INÍCIO DA MUDANÇA NO MENU ***
                                     React.createElement(MenuCategory, { title: "Dashboard", icon: "LayoutDashboard", menuKey: "dashboard" },
                                         React.createElement(MenuItem, { page: 'dashboard', icon: 'FileText', text: 'Controle de Alertas' }),
-                                        React.createElement(MenuItem, { page: 'analiseCustos', icon: 'Beaker', text: 'Análise de Custos' }),
+                                        React.createElement(MenuItem, { page: 'analiseCustos', icon: 'Beaker', text: 'Análise Comparativa' }), // <-- NOME ATUALIZADO
                                         React.createElement(MenuItem, { page: 'analiseEquipamentos', icon: 'Ship', text: 'Consumo por Equipamento' })
                                     ),
                                     React.createElement(MenuCategory, { title: "Importação", icon: "PlusCircle", menuKey: "importacao" },
-                                        React.createElement(MenuItem, { page: 'ticketAbastecimentos', icon: ticketIconUrl, text: 'Abastecimentos' }),
-                                        React.createElement(MenuItem, { page: 'ctaAbastecimentos', icon: ctaIconUrl, text: 'Abastecimentos' }),
-                                        React.createElement(MenuItem, { page: 'ctaCarregamentos', icon: ctaIconUrl, text: 'Carregamentos' }),
-                                        React.createElement(MenuItem, { page: 'shellAbastecimentos', icon: shellIconUrl, text: 'Abastecimentos' })
+                                        React.createElement(MenuItem, { page: 'ticketAbastecimentos', icon: ticketIconUrl, text: 'Ticket' }),
+                                        React.createElement(MenuItem, { page: 'ctaAbastecimentos', icon: ctaIconUrl, text: 'CTA - Abastecimentos' }),
+                                        React.createElement(MenuItem, { page: 'ctaCarregamentos', icon: ctaIconUrl, text: 'CTA - Carregamentos' }),
+                                        React.createElement(MenuItem, { page: 'shellAbastecimentos', icon: shellIconUrl, text: 'Shell' })
                                     ),
                                     React.createElement(MenuCategory, { title: "Operacional", icon: "Settings", menuKey: "operacional" },
                                         React.createElement(MenuItem, { page: 'alertas', icon: 'FileText', text: 'Painel de Alertas' }),
                                         React.createElement(MenuItem, { page: 'afericoes', icon: 'Tank', text: 'Aferições e Perdas' })
                                     ),
-                                    // *** FIM DA MUDANÇA NO MENU ***
                                     user.nivel_permissao === 'administrador' && React.createElement(MenuCategory, { title: "Cadastros", icon: "FileText", menuKey: "cadastros" },
                                         React.createElement(MenuItem, { page: 'cadastroFiliais', icon: 'Building', text: 'Filiais (DE/PARA)' }),
                                         React.createElement(MenuItem, { page: 'mapeamentoCombustivel', icon: 'Fuel', text: 'DE/PARA Combustível' }),
