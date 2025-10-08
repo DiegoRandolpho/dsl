@@ -1294,7 +1294,12 @@
                             ),
                             React.createElement('nav', { className: "flex-grow" },
                                 React.createElement('ul', { className: "space-y-2" },
-                                    React.createElement(MenuItem, { page: 'dashboard', icon: 'LayoutDashboard', text: 'Dashboard' }),
+                                    // *** INÍCIO DA MUDANÇA NO MENU ***
+                                    React.createElement(MenuCategory, { title: "Dashboard", icon: "LayoutDashboard", menuKey: "dashboard" },
+                                        React.createElement(MenuItem, { page: 'dashboard', icon: 'FileText', text: 'Controle de Alertas' }),
+                                        React.createElement(MenuItem, { page: 'analiseCustos', icon: 'Beaker', text: 'Análise de Custos' }),
+                                        React.createElement(MenuItem, { page: 'analiseEquipamentos', icon: 'Ship', text: 'Consumo por Equipamento' })
+                                    ),
                                     React.createElement(MenuCategory, { title: "Importação", icon: "PlusCircle", menuKey: "importacao" },
                                         React.createElement(MenuItem, { page: 'ticketAbastecimentos', icon: ticketIconUrl, text: 'Abastecimentos' }),
                                         React.createElement(MenuItem, { page: 'ctaAbastecimentos', icon: ctaIconUrl, text: 'Abastecimentos' }),
@@ -1303,10 +1308,9 @@
                                     ),
                                     React.createElement(MenuCategory, { title: "Operacional", icon: "Settings", menuKey: "operacional" },
                                         React.createElement(MenuItem, { page: 'alertas', icon: 'FileText', text: 'Painel de Alertas' }),
-                                        React.createElement(MenuItem, { page: 'afericoes', icon: 'Tank', text: 'Aferições e Perdas' }),
-                                        React.createElement(MenuItem, { page: 'analiseCustos', icon: 'Beaker', text: 'Análise de Custos' }),
-                                        React.createElement(MenuItem, { page: 'analiseEquipamentos', icon: 'Ship', text: 'Consumo por Equipamento' })
+                                        React.createElement(MenuItem, { page: 'afericoes', icon: 'Tank', text: 'Aferições e Perdas' })
                                     ),
+                                    // *** FIM DA MUDANÇA NO MENU ***
                                     user.nivel_permissao === 'administrador' && React.createElement(MenuCategory, { title: "Cadastros", icon: "FileText", menuKey: "cadastros" },
                                         React.createElement(MenuItem, { page: 'cadastroFiliais', icon: 'Building', text: 'Filiais (DE/PARA)' }),
                                         React.createElement(MenuItem, { page: 'mapeamentoCombustivel', icon: 'Fuel', text: 'DE/PARA Combustível' }),
