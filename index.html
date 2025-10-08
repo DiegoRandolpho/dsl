@@ -3074,9 +3074,9 @@ function ShellAbastecimentos({ user, showToast }) {
                 // NOVO ESTADO PARA CONTROLAR A VISUALIZAÇÃO DE UMA PLACA ESPECÍFICA
                 const [viewingPlaca, setViewingPlaca] = React.useState(null);
 
-                const ctaIconUrl = 'https://ikypygpbdmoxozfmwewr.supabase.co/storage/v1/object/public/ICONS/CTAICON.png';
-                const ticketIconUrl = 'https://ikypygpbdmoxozfmwewr.supabase.co/storage/v1/object/public/ICONS/TICKET.png';
-                const shellIconUrl = 'https://ikypygpbdmoxozfmwewr.supabase.co/storage/v1/object/public/ICONS/Shell-958x575-1-Photoroom-Photoroom.png';
+                const ctaIconUrl = 'https://ikypygpbdmoxozfmwewr.supabase.co/storage/v1/object/sign/ICONS/CTAICON.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9lMGJiMDk5Zi1jZmE5LTQ5Y2UtYjUwNy0wZmE2ZWZkYWYxOTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJJQ09OUy9DVEFJQ09OLnBuZyIsImlhdCI6MTc1OTk2Njc0NywiZXhwIjoyMDc1MzI2NzQ3fQ.sfY6KIR1cAyug6oAOfAYvBQbByPHDS10HioBFBVr5lw';
+                const ticketIconUrl = 'hhttps://ikypygpbdmoxozfmwewr.supabase.co/storage/v1/object/sign/ICONS/TICKET.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9lMGJiMDk5Zi1jZmE5LTQ5Y2UtYjUwNy0wZmE2ZWZkYWYxOTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJJQ09OUy9USUNLRVQucG5nIiwiaWF0IjoxNzU5OTY2NzIyLCJleHAiOjIwNzUzMjY3MjJ9.FhlZIBzREp3f8_9QeOVXICB-63VmM6IYnK9ZH7gejhA';
+                const shellIconUrl = 'https://ikypygpbdmoxozfmwewr.supabase.co/storage/v1/object/sign/ICONS/Shell-958x575-1-Photoroom-Photoroom.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9lMGJiMDk5Zi1jZmE5LTQ5Y2UtYjUwNy0wZmE2ZWZkYWYxOTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJJQ09OUy9TaGVsbC05NTh4NTc1LTEtUGhvdG9yb29tLVBob3Rvcm9vbS5wbmciLCJpYXQiOjE3NTk5NjY2OTQsImV4cCI6MjA3NTMyNjY5NH0.IAKKyeSGzMJ9QK9yuO_xVkRCwBaGipCLgN3CyFM8_Oo';
 
                 const handleLogin = (userData) => {
                     localStorage.setItem('userSession', JSON.stringify(userData));
