@@ -720,6 +720,631 @@
                     )
                 );
             }
+            function AnaliseCustos({ user, showToast }) {
+                const [dados, setDados] = React.useState(null);
+                const [isLoading, setIsLoading] = React.useState(true);
+
+                const ChartComponent = ({ chartId, type, data, options }) => {
+                    const canvasRef = React.useRef(null);
+                    React.useEffect(() => {
+                        if (!canvasRef.current || !data) return;
+                        const chart = new Chart(canvasRef.current, { type, data, options });
+                        return () => chart.destroy();
+                    }, [data, type, options]);
+                    return React.createElement('canvas', { ref: canvasRef, id: chartId });
+                };
+
+                React.useEffect(() => {
+                    const fetchData = async () => {
+                        setIsLoading(true);
+                        try {
+                            const [ticketRes, shellRes, ctaRes] = await Promise.all([
+                                supabase.from('ticket_abastecimentos').select('valor_emissao, litros, data_transacao'),
+                                supabase.from('shell_abastecimentos').select('total_abastecimento, litros, data_hora_transacao'),
+                                supabase.from('cta_abastecimentos').select('custo_total, volume, data_hora_inicio')
+                            ]);
+
+                            if (ticketRes.error || shellRes.error || ctaRes.error) throw new Error("Falha ao buscar dados de abastecimento.");
+
+                            const processaDados = (dados, campoValor, campoLitros, campoData) => {
+                                return dados.reduce((acc, item) => {
+                                    const periodo = new Date(item[campoData]).toLocaleDateString('pt-BR', { month: '2-digit', year: 'numeric' });
+                                    if (!periodo || !item[campoValor] || !item[campoLitros]) return acc;
+                                    
+                                    acc.custoTotal = (acc.custoTotal || 0) + item[campoValor];
+                                    acc.volumeTotal = (acc.volumeTotal || 0) + item[campoLitros];
+
+                                    const periodoData = acc.periodos[periodo] || { custo: 0, volume: 0 };
+                                    periodoData.custo += item[campoValor];
+                                    periodoData.volume += item[campoLitros];
+                                    acc.periodos[periodo] = periodoData;
+
+                                    return acc;
+                                }, { custoTotal: 0, volumeTotal: 0, periodos: {} });
+                            };
+
+                            const ticketData = processaDados(ticketRes.data, 'valor_emissao', 'litros', 'data_transacao');
+                            const shellData = processaDados(shellRes.data, 'total_abastecimento', 'litros', 'data_hora_transacao');
+                            const ctaData = processaDados(ctaRes.data, 'custo_total', 'volume', 'data_hora_inicio');
+
+                            // Unifica e ordena todos os períodos
+                            const todosPeriodos = [...new Set([...Object.keys(ticketData.periodos), ...Object.keys(shellData.periodos), ...Object.keys(ctaData.periodos)])];
+                            todosPeriodos.sort((a, b) => {
+                                const [mesA, anoA] = a.split('/'); const [mesB, anoB] = b.split('/');
+                                return new Date(anoA, mesA - 1) - new Date(anoB, mesB - 1);
+                            });
+
+                            const chartData = {
+                                labels: todosPeriodos,
+                                datasets: [
+                                    { label: 'Ticket (R$/L)', data: todosPeriodos.map(p => ticketData.periodos[p] ? (ticketData.periodos[p].custo / ticketData.periodos[p].volume) : null), borderColor: 'rgb(234, 179, 8)', backgroundColor: 'rgba(234, 179, 8, 0.5)', tension: 0.1, spanGaps: true },
+                                    { label: 'Shell (R$/L)', data: todosPeriodos.map(p => shellData.periodos[p] ? (shellData.periodos[p].custo / shellData.periodos[p].volume) : null), borderColor: 'rgb(239, 68, 68)', backgroundColor: 'rgba(239, 68, 68, 0.5)', tension: 0.1, spanGaps: true },
+                                    { label: 'CTA (R$/L)', data: todosPeriodos.map(p => ctaData.periodos[p] ? (ctaData.periodos[p].custo / ctaData.periodos[p].volume) : null), borderColor: 'rgb(59, 130, 246)', backgroundColor: 'rgba(59, 130, 246, 0.5)', tension: 0.1, spanGaps: true }
+                                ]
+                            };
+
+                            setDados({ ticketData, shellData, ctaData, chartData });
+
+                        } catch (err) {
+                            showToast("Erro ao carregar dados para análise.", "error");
+                        }
+                        setIsLoading(false);
+                    };
+
+                    fetchData();
+                }, [showToast]);
+
+                const InfoCard = ({ titulo, valor, subtitulo }) => (
+                    React.createElement('div', { className: 'bg-gray-50 p-4 rounded-lg' },
+                        React.createElement('p', { className: 'text-sm font-medium text-gray-500' }, titulo),
+                        React.createElement('p', { className: 'text-2xl font-bold text-gray-800 mt-1' }, valor),
+                        React.createElement('p', { className: 'text-xs text-gray-400' }, subtitulo)
+                    )
+                );
+                
+                if (isLoading) {
+                    return React.createElement('p', null, 'Carregando dados para análise...');
+                }
+
+                return React.createElement('div', { className: 'bg-white p-6 rounded-xl shadow-lg' },
+                    React.createElement('h2', { className: "text-2xl font-bold text-gray-800 mb-6 text-center" }, "Análise de Custos por Plataforma"),
+                    React.createElement('div', { className: 'grid grid-cols-1 md:grid-cols-3 gap-6 mb-8' },
+                        // Coluna Ticket
+                        React.createElement('div', { className: 'border p-4 rounded-lg' }, 
+                            React.createElement('h3', {className: 'font-bold text-lg mb-4 text-center'}, 'Ticket Log'),
+                            React.createElement(InfoCard, { titulo: 'Custo Total', valor: `R$ ${dados.ticketData.custoTotal.toFixed(2)}`, subtitulo: `${dados.ticketData.volumeTotal.toFixed(2)} L` }),
+                            React.createElement(InfoCard, { titulo: 'Preço Médio', valor: `R$ ${(dados.ticketData.custoTotal / dados.ticketData.volumeTotal || 0).toFixed(3)}`, subtitulo: 'por Litro' })
+                        ),
+                        // Coluna Shell
+                        React.createElement('div', { className: 'border p-4 rounded-lg' }, 
+                            React.createElement('h3', {className: 'font-bold text-lg mb-4 text-center'}, 'Shell Box'),
+                             React.createElement(InfoCard, { titulo: 'Custo Total', valor: `R$ ${dados.shellData.custoTotal.toFixed(2)}`, subtitulo: `${dados.shellData.volumeTotal.toFixed(2)} L` }),
+                            React.createElement(InfoCard, { titulo: 'Preço Médio', valor: `R$ ${(dados.shellData.custoTotal / dados.shellData.volumeTotal || 0).toFixed(3)}`, subtitulo: 'por Litro' })
+                        ),
+                        // Coluna CTA
+                        React.createElement('div', { className: 'border p-4 rounded-lg' }, 
+                            React.createElement('h3', {className: 'font-bold text-lg mb-4 text-center'}, 'CTA'),
+                            React.createElement(InfoCard, { titulo: 'Custo Total', valor: `R$ ${dados.ctaData.custoTotal.toFixed(2)}`, subtitulo: `${dados.ctaData.volumeTotal.toFixed(2)} L` }),
+                            React.createElement(InfoCard, { titulo: 'Preço Médio', valor: `R$ ${(dados.ctaData.custoTotal / dados.ctaData.volumeTotal || 0).toFixed(3)}`, subtitulo: 'por Litro' })
+                        )
+                    ),
+                    React.createElement('div', { className: 'bg-white p-6 rounded-xl shadow-lg' },
+                        React.createElement('h3', { className: 'text-lg font-semibold text-gray-800 mb-4' }, 'Evolução do Preço Médio (R$/L) por Período'),
+                        React.createElement('div', { className: 'h-80' },
+                            React.createElement(ChartComponent, { chartId: 'custosChart', type: 'line', data: dados.chartData, options: { maintainAspectRatio: false, responsive: true } })
+                        )
+                    )
+                );
+            }
+            function AnaliseEquipamentos({ user, showToast }) {
+                const [dados, setDados] = React.useState(null);
+                const [isLoading, setIsLoading] = React.useState(true);
+
+                const ChartComponent = ({ chartId, type, data, options }) => {
+                    const canvasRef = React.useRef(null);
+                    React.useEffect(() => {
+                        if (!canvasRef.current || !data) return;
+                        const chart = new Chart(canvasRef.current, { type, data, options });
+                        return () => chart.destroy();
+                    }, [data, type, options]);
+                    return React.createElement('canvas', { ref: canvasRef, id: chartId });
+                };
+
+                React.useEffect(() => {
+                    const fetchData = async () => {
+                        setIsLoading(true);
+                        try {
+                            // 1. Busca todos os abastecimentos
+                            const [ticketRes, shellRes, ctaRes] = await Promise.all([
+                                supabase.from('ticket_abastecimentos').select('placa, litros'),
+                                supabase.from('shell_abastecimentos').select('placa, litros'),
+                                supabase.from('cta_abastecimentos').select('placa, volume')
+                            ]);
+
+                            if (ticketRes.error || shellRes.error || ctaRes.error) throw new Error("Falha ao buscar dados de abastecimento.");
+                            
+                            const todosAbastecimentos = [
+                                ...(ticketRes.data || []),
+                                ...(shellRes.data || []),
+                                ...(ctaRes.data.map(a => ({...a, litros: a.volume}))) // Renomeia 'volume' para 'litros'
+                            ];
+
+                            const placasUnicas = [...new Set(todosAbastecimentos.map(a => a.placa).filter(Boolean))];
+
+                            // 2. Busca os tipos de equipamento na base externa
+                            const { data: equipamentos, error: eqError } = await supabaseProjeto2.from('equipamentos').select('plate, type').in('plate', placasUnicas);
+                            if (eqError) throw eqError;
+
+                            const tipoPorPlaca = new Map(equipamentos.map(eq => [eq.plate, eq.type || 'Não Categorizado']));
+
+                            // 3. Agrupa o consumo por tipo de equipamento
+                            const consumoPorTipo = todosAbastecimentos.reduce((acc, abs) => {
+                                const tipo = tipoPorPlaca.get(abs.placa) || 'Não Categorizado';
+                                acc[tipo] = (acc[tipo] || 0) + (abs.litros || 0);
+                                return acc;
+                            }, {});
+
+                            const sortedData = Object.entries(consumoPorTipo).sort(([,a],[,b]) => b-a);
+                            
+                            const chartData = {
+                                labels: sortedData.map(([tipo]) => tipo),
+                                datasets: [{
+                                    label: 'Volume Consumido (L)',
+                                    data: sortedData.map(([, volume]) => volume.toFixed(2)),
+                                    backgroundColor: ['rgba(59, 130, 246, 0.7)', 'rgba(234, 179, 8, 0.7)', 'rgba(239, 68, 68, 0.7)', 'rgba(34, 197, 94, 0.7)'],
+                                    borderColor: ['rgb(59, 130, 246)', 'rgb(234, 179, 8)', 'rgb(239, 68, 68)', 'rgb(34, 197, 94)'],
+                                    borderWidth: 1
+                                }]
+                            };
+
+                            setDados({ chartData, tableData: sortedData });
+
+                        } catch (err) {
+                            showToast("Erro ao carregar dados para análise.", "error");
+                        }
+                        setIsLoading(false);
+                    };
+                    fetchData();
+                }, [showToast]);
+
+                if (isLoading) {
+                    return React.createElement('p', null, 'Carregando dados de consumo por equipamento...');
+                }
+
+                return React.createElement('div', { className: 'bg-white p-6 rounded-xl shadow-lg' },
+                    React.createElement('h2', { className: "text-2xl font-bold text-gray-800 mb-6 text-center" }, "Análise de Consumo por Tipo de Equipamento"),
+                    React.createElement('div', { className: 'grid grid-cols-1 lg:grid-cols-2 gap-8' },
+                        React.createElement('div', { className: 'h-96' },
+                           React.createElement(ChartComponent, { chartId: 'consumoTipoChart', type: 'bar', data: dados.chartData, options: { maintainAspectRatio: false, responsive: true, indexAxis: 'y' } })
+                        ),
+                        React.createElement('div', { className: 'max-h-96 overflow-y-auto' },
+                            React.createElement('table', { className: 'w-full text-sm text-left' },
+                                React.createElement('thead', { className: 'text-xs text-gray-700 uppercase bg-gray-100' },
+                                    React.createElement('tr', null, 
+                                        React.createElement('th', { className: 'px-6 py-3' }, 'Tipo de Equipamento'),
+                                        React.createElement('th', { className: 'px-6 py-3' }, 'Volume Total (L)')
+                                    )
+                                ),
+                                React.createElement('tbody', null,
+                                    dados.tableData.map(([tipo, volume]) => 
+                                        React.createElement('tr', { key: tipo, className: 'bg-white border-b' },
+                                            React.createElement('td', { className: 'px-6 py-4 font-medium text-gray-900' }, tipo),
+                                            React.createElement('td', { className: 'px-6 py-4' }, volume.toFixed(2))
+                                        )
+                                    )
+                                )
+                            )
+                        )
+                    )
+                );
+            }
+            function Afericoes({ user, showToast }) {
+                const [afericoes, setAfericoes] = React.useState([]);
+                const [isLoading, setIsLoading] = React.useState(false);
+                const [showForm, setShowForm] = React.useState(false);
+                const [opcoesTanque, setOpcoesTanque] = React.useState([]);
+                const initialFormState = { tanque: '', data_afericao: '', volume_balde: 20, volume_cta: '', volume_bomba: '', observacao: '' };
+                const [formData, setFormData] = React.useState(initialFormState);
+                const [filters, setFilters] = React.useState({ tanque: '', data_inicio: null, data_fim: null });
+                const [hasSearched, setHasSearched] = React.useState(false);
+
+                 const ChartComponent = ({ chartId, type, data, options }) => {
+                    const canvasRef = React.useRef(null);
+                    React.useEffect(() => {
+                        if (!canvasRef.current || !data) return;
+                        const chart = new Chart(canvasRef.current, { type, data, options });
+                        return () => chart.destroy();
+                    }, [data, type, options]);
+                    return React.createElement('canvas', { ref: canvasRef, id: chartId });
+                };
+
+                React.useEffect(() => {
+                    const fetchTanqueOptions = async () => {
+                        const { data, error } = await supabase
+                            .from('filiais')
+                            .select('centro_de_custo_final')
+                            .not('cta_cod_posto', 'is', null);
+
+                        if (error) {
+                            showToast("Erro ao carregar opções de tanque.", "error");
+                        } else {
+                            const uniqueOptions = [...new Set(data.map(item => item.centro_de_custo_final).filter(Boolean))];
+                            setOpcoesTanque(uniqueOptions.sort());
+                        }
+                    };
+                    fetchTanqueOptions();
+                }, [showToast]);
+
+                const formatDate = (dateString) => {
+                    if (!dateString) return '—';
+                    const date = new Date(dateString.includes('T') ? dateString : dateString + 'T00:00:00');
+                    return date.toLocaleDateString('pt-BR');
+                };
+
+                const handleFilterChange = (e) => { setFilters(prev => ({ ...prev, [e.target.name]: e.target.value })); };
+                const handleInputChange = (e) => { setFormData(prev => ({ ...prev, [e.target.name]: e.target.value })); };
+                
+                const handleSearch = async () => {
+                    setHasSearched(true);
+                    setIsLoading(true);
+                    try {
+                        let query = supabase.from('afericoes').select('*');
+                        if (filters.tanque) query = query.ilike('tanque', `%${filters.tanque.trim()}%`);
+                        if (filters.data_inicio) {
+                            query = query.gte('data_afericao', filters.data_inicio.toISOString());
+                        }
+                        if (filters.data_fim) {
+                            const endDate = new Date(filters.data_fim);
+                            endDate.setHours(23, 59, 59, 999);
+                            query = query.lte('data_afericao', endDate.toISOString());
+                        }
+                        query = query.order('data_afericao', { ascending: false });
+                        const { data, error } = await query;
+                        if (error) throw error;
+                        setAfericoes(data || []);
+                    } catch (err) {
+                        showToast("Erro ao buscar aferições.", "error");
+                    }
+                    setIsLoading(false);
+                };
+
+                const handleFormSubmit = async (e) => {
+                    e.preventDefault();
+                    setIsLoading(true);
+                    try {
+                        const recordToInsert = { ...formData, volume_balde: parseFloat(formData.volume_balde) || 0, volume_cta: parseFloat(formData.volume_cta) || 0, volume_bomba: parseFloat(formData.volume_bomba) || 0, usuario_criacao: user.nome, };
+                        const { error: insertError } = await supabase.from('afericoes').insert([recordToInsert]);
+                        if (insertError) throw insertError;
+
+                        showToast("Aferição registrada com sucesso!", "success");
+
+                        if (formData.tanque && formData.data_afericao) {
+                            const dataObj = new Date(formData.data_afericao + 'T12:00:00');
+                            const periodo = dataObj.toLocaleDateString('pt-BR', { month: '2-digit', year: 'numeric' });
+
+                            await supabase
+                                .from('alertas')
+                                .update({
+                                    status: 'concluido',
+                                    observacao: `Aferição registrada em ${dataObj.toLocaleDateString('pt-BR')}. Concluído automaticamente.`,
+                                    usuario_conclusao: 'Sistema',
+                                    data_conclusao: new Date().toISOString()
+                                })
+                                .eq('placa', formData.tanque)
+                                .eq('periodo', periodo)
+                                .eq('tipo_alerta', 'Aferição não realizada')
+                                .eq('status', 'pendente');
+                        }
+
+                        setFormData(initialFormState);
+                        setShowForm(false);
+                        setHasSearched(false);
+                        setAfericoes([]);
+                    } catch (err) {
+                        showToast(`Erro ao registrar: ${err.message}`, "error");
+                    }
+                    setIsLoading(false);
+                };
+
+                const stats = React.useMemo(() => {
+                    if (!afericoes || afericoes.length === 0) return { variacaoMedia: 0, perdaTotal: 0, chartData: null };
+
+                    let perdaTotal = 0;
+                    const variacoes = [];
+                    
+                    const chartDataProcessed = afericoes
+                        .sort((a,b) => new Date(a.data_afericao) - new Date(b.data_afericao))
+                        .map(item => {
+                            const diffBomba = item.volume_bomba - item.volume_balde;
+                            perdaTotal += diffBomba;
+                            variacoes.push(diffBomba);
+                            return {
+                                data: new Date(item.data_afericao + 'T12:00:00').toLocaleDateString('pt-BR'),
+                                variacao: diffBomba
+                            };
+                        });
+
+                    const variacaoMedia = variacoes.length > 0 ? variacoes.reduce((a,b) => a+b, 0) / variacoes.length : 0;
+
+                    const chartData = {
+                        labels: chartDataProcessed.map(d => d.data),
+                        datasets: [{
+                            label: 'Variação Bomba vs. Balde (L)',
+                            data: chartDataProcessed.map(d => d.variacao),
+                            borderColor: 'rgb(239, 68, 68)',
+                            backgroundColor: 'rgba(239, 68, 68, 0.5)',
+                            tension: 0.1
+                        }]
+                    };
+                    
+                    return { variacaoMedia, perdaTotal, chartData };
+                }, [afericoes]);
+
+                return React.createElement('div', { className: "bg-white p-6 rounded-xl shadow-lg" },
+                    React.createElement('h2', { className: "text-2xl font-bold text-gray-800 mb-6 text-center" }, "Aferições de Tanques e Análise de Variação"),
+                    
+                    !showForm && React.createElement('div', { className: 'flex justify-center mb-6' },
+                        React.createElement('button', { onClick: () => setShowForm(true), className: "p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center" }, React.createElement(LucideIcon, { name: 'PlusCircle', className: 'mr-2 h-5 w-5' }), "Nova Aferição")
+                    ),
+                    showForm && React.createElement('form', { onSubmit: handleFormSubmit, className: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8 p-4 border rounded-lg bg-gray-50" },
+                        React.createElement('select', { name: "tanque", value: formData.tanque, onChange: handleInputChange, className: "p-2 border rounded", required: true }, React.createElement('option', { value: '' }, 'Selecione o Tanque*'), opcoesTanque.map(t => React.createElement('option', { key: t, value: t }, t))),
+                        React.createElement('input', { name: "data_afericao", type: "date", value: formData.data_afericao, onChange: handleInputChange, className: "p-2 border rounded", required: true }),
+                        React.createElement('input', { name: "volume_balde", type: "number", step: "0.01", value: formData.volume_balde, onChange: handleInputChange, placeholder: "Volume Balde (L)*", className: "p-2 border rounded" }),
+                        React.createElement('input', { name: "volume_cta", type: "number", step: "0.01", value: formData.volume_cta, onChange: handleInputChange, placeholder: "Volume CTA (L)", className: "p-2 border rounded" }),
+                        React.createElement('input', { name: "volume_bomba", type: "number", step: "0.01", value: formData.volume_bomba, onChange: handleInputChange, placeholder: "Volume Bomba (L)", className: "p-2 border rounded" }),
+                        React.createElement('input', { name: "observacao", value: formData.observacao, onChange: handleInputChange, placeholder: "Observação", className: "p-2 border rounded" }),
+                        React.createElement('div', { className: "md:col-span-full flex justify-end gap-4" }, React.createElement('button', { type: "button", onClick: () => setShowForm(false), className: "py-2 px-4 bg-gray-300 rounded-lg" }, "Cancelar"), React.createElement('button', { type: "submit", className: "py-2 px-4 bg-blue-600 text-white rounded-lg", disabled: isLoading }, isLoading ? 'Salvando...' : 'Salvar'))
+                    ),
+
+                    React.createElement('div', { className: "mb-6 p-4 border rounded-lg bg-gray-50 grid grid-cols-1 md:grid-cols-3 gap-4 items-end" },
+                        React.createElement('div', { className: "md:col-span-2" },
+                            React.createElement(DateRangePicker, { onDatesChange: (dates) => { setFilters(prev => ({ ...prev, data_inicio: dates[0] || null, data_fim: dates[1] || null })); } })
+                        ),
+                        React.createElement('div', null, React.createElement('label', { className: "block text-sm font-medium" }, "Tanque"), React.createElement('input', { type: "text", name: "tanque", value: filters.tanque, onChange: handleFilterChange, className: "mt-1 w-full p-2 border rounded" })),
+                        React.createElement('button', { onClick: handleSearch, disabled: isLoading, className: "w-full p-2 bg-blue-600 text-white rounded-lg md:col-start-3" }, 'Buscar')
+                    ),
+                    
+                    hasSearched && afericoes.length > 0 && React.createElement('div', { className: 'mb-8' },
+                        React.createElement('div', { className: 'grid grid-cols-1 md:grid-cols-2 gap-6 mb-6' },
+                            React.createElement('div', { className: 'bg-gray-50 p-4 rounded-lg text-center' },
+                                React.createElement('p', { className: 'text-sm font-medium text-gray-500' }, 'Variação Média por Aferição'),
+                                React.createElement('p', { className: `text-2xl font-bold mt-1 ${stats.variacaoMedia > 0 ? 'text-red-600' : 'text-green-600'}` }, `${stats.variacaoMedia.toFixed(3)} L`)
+                            ),
+                             React.createElement('div', { className: 'bg-gray-50 p-4 rounded-lg text-center' },
+                                React.createElement('p', { className: 'text-sm font-medium text-gray-500' }, 'Sobra / Perda Total no Período'),
+                                React.createElement('p', { className: `text-2xl font-bold mt-1 ${stats.perdaTotal > 0 ? 'text-red-600' : 'text-green-600'}` }, `${stats.perdaTotal.toFixed(2)} L`)
+                            )
+                        ),
+                        React.createElement('div', { className: 'h-80 bg-gray-50 p-4 rounded-lg' },
+                            React.createElement(ChartComponent, { chartId: 'afericoesChart', type: 'line', data: stats.chartData, options: { maintainAspectRatio: false, responsive: true } })
+                        )
+                    ),
+
+                    React.createElement('div', { className: "rounded-lg border border-slate-200 shadow-sm overflow-hidden" },
+                        React.createElement('table', { className: "w-full text-sm text-left text-slate-600" },
+                            React.createElement('thead', { className: "text-xs text-slate-700 uppercase bg-slate-100" },
+                                React.createElement('tr', null,
+                                    ["Data Aferição", "Tanque", "Vol. Balde", "Vol. CTA", "Vol. Bomba", "Diferenças", "Observação"].map(h => React.createElement('th', { key: h, className: "px-6 py-4 font-semibold border-b border-r border-slate-200 last:border-r-0" }, h))
+                                )
+                            ),
+                            React.createElement('tbody', null,
+                                isLoading ? React.createElement('tr', null, React.createElement('td', { colSpan: 7, className: "p-4 text-center" }, "Carregando...")) :
+                                !hasSearched ? React.createElement('tr', null, React.createElement('td', { colSpan: 7, className: "p-6 text-center text-slate-500" }, "Utilize os filtros para buscar as aferições.")) :
+                                afericoes.length === 0 ? React.createElement('tr', null, React.createElement('td', { colSpan: 7, className: "p-6 text-center text-slate-500" }, "Nenhuma aferição encontrada.")) :
+                                afericoes.map(item => {
+                                    const diffCta = item.volume_cta - item.volume_balde;
+                                    const diffBomba = item.volume_bomba - item.volume_balde;
+                                    return React.createElement('tr', { key: item.id, className: "hover:bg-blue-50 even:bg-slate-50" },
+                                        React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, formatDate(item.data_afericao)),
+                                        React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, React.createElement('span', { className: 'font-medium text-slate-800' }, item.tanque)),
+                                        React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, item.volume_balde.toFixed(2)),
+                                        React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, item.volume_cta.toFixed(2)),
+                                        React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" }, item.volume_bomba.toFixed(2)),
+                                        React.createElement('td', { className: "px-6 py-4 border-r border-slate-200" },
+                                            React.createElement('div', null,
+                                                React.createElement('p', { className: diffCta !== 0 ? 'text-red-600 font-semibold' : '' }, `CTA: ${diffCta.toFixed(2)} L`),
+                                                React.createElement('p', { className: diffBomba !== 0 ? 'text-red-600 font-semibold' : '' }, `Bomba: ${diffBomba.toFixed(2)} L`)
+                                            )
+                                        ),
+                                        React.createElement('td', { className: "px-6 py-4" }, item.observacao)
+                                    );
+                                })
+                            )
+                        )
+                    )
+                );
+            }
+            function App() {
+                const [user, setUser] = React.useState(() => {
+                    const savedUser = localStorage.getItem('userSession');
+                    return savedUser ? JSON.parse(savedUser) : null;
+                });
+                const [currentPage, setCurrentPage] = React.useState('dashboard');
+                const [toast, setToast] = React.useState({ show: false, message: '', type: '' });
+                const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
+                const [openMenu, setOpenMenu] = React.useState('');
+                const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(false);
+                
+                const ctaIconUrl = 'https://ikypygpbdmoxozfmwewr.supabase.co/storage/v1/object/sign/ICONS/CTAICON.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9lMGJiMDk5Zi1jZmE5LTQ5Y2UtYjUwNy0wZmE2ZWZkYWYxOTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJJQ09OUy9DVEFJQ09OLnBuZyIsImlhdCI6MTc1OTg2NTA1OSwiZXhwIjoyMDc1MjI1MDU5fQ.xnv-1nyrxg9XsQxLr7uoUQs2rpgzBeSfWXoX8Y37Y-U';
+                const ticketIconUrl = 'https://ikypygpbdmoxozfmwewr.supabase.co/storage/v1/object/sign/ICONS/TICKET.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9lMGJiMDk5Zi1jZmE5LTQ5Y2UtYjUwNy0wZmE2ZWZkYWYxOTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJJQ09OUy9USUNLRVQucG5nIiwiaWF0IjoxNzU5ODY1MTkzLCJleHAiOjIwNzUyMjUxOTN9.EUaHSgL2RjDC8Dt2XWtibSNhh6NtPy8G-3kFQHDpvQY';
+                const shellIconUrl = 'https://ikypygpbdmoxozfmwewr.supabase.co/storage/v1/object/sign/ICONS/Shell-958x575-1-Photoroom-Photoroom.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9lMGJiMDk5Zi1jZmE5LTQ5Y2UtYjUwNy0wZmE2ZWZkYWYxOTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJJQ09OUy9TaGVsbC05NTh4NTc1LTEtUGhvdG9yb29tLVBob3Rvcm9vbS5wbmciLCJpYXQiOjE3NTk4NjUyMTAsImV4cCI6MjA3NTIyNTIxMH0.gw9lTQcpcCYLyYgX1GP2BsZcT8Hg2o7eCyNO_b8fqM0';
+
+                const handleLogin = (userData) => {
+                    localStorage.setItem('userSession', JSON.stringify(userData));
+                    setUser(userData);
+                    setCurrentPage('dashboard');
+                };
+                const handleLogout = () => {
+                    localStorage.removeItem('userSession');
+                    setUser(null);
+                };
+                const showToast = (message, type = 'success') => setToast({ show: true, message, type });
+                const closeToast = () => setToast({ show: false, message: '', type: '' });
+                const toggleMenu = (menu) => {
+                    if (isSidebarCollapsed) {
+                        setIsSidebarCollapsed(false);
+                    } else {
+                        setOpenMenu(openMenu === menu ? '' : menu);
+                    }
+                };
+                const toggleSidebarCollapse = () => {
+                    setIsSidebarCollapsed(!isSidebarCollapsed);
+                    if (!isSidebarCollapsed) {
+                        setOpenMenu('');
+                    }
+                };
+                
+                const renderPage = () => {
+                    switch (currentPage) {
+                        case 'dashboard': return React.createElement(Dashboard, { user, showToast, setCurrentPage: setCurrentPage });
+                        case 'ticketAbastecimentos': return React.createElement(TicketAbastecimentos, { user, showToast });
+                        case 'ctaAbastecimentos': return React.createElement(CtaAbastecimentos, { user, showToast });
+                        case 'ctaCarregamentos': return React.createElement(CtaCarregamentos, { user, showToast });
+                        case 'shellAbastecimentos': return React.createElement(ShellAbastecimentos, { user, showToast });
+                        case 'afericoes': return React.createElement(Afericoes, { user, showToast });
+                        case 'alertas': return React.createElement(Alertas, { user, showToast });
+                        
+                        case 'analiseCustos': return React.createElement(AnaliseCustos, { user, showToast });
+                        case 'analiseEquipamentos': return React.createElement(AnaliseEquipamentos, { user, showToast });
+
+                        case 'cadastroFiliais': return user.nivel_permissao === 'administrador' ? React.createElement(CadastroFiliais, { user, showToast }) : null;
+                        case 'mapeamentoCombustivel': return user.nivel_permissao === 'administrador' ? React.createElement(MapeamentoCombustivel, { user, showToast }) : null;
+                        case 'cadastroAlertas': return user.nivel_permissao === 'administrador' ? React.createElement(CadastroAlertas, { user, showToast }) : null;
+                        case 'userManagement': return React.createElement(UserManagement, { user, showToast });
+                        default: return React.createElement(Dashboard, { user, showToast, setCurrentPage: setCurrentPage });
+                    }
+                };
+
+                if (!user) {
+                    return React.createElement(LoginPage, { onLogin: handleLogin });
+                }
+
+                const MenuItem = ({ page, icon, text }) => {
+                   const isActive = currentPage === page;
+                   let iconElement;
+                   
+                   if (typeof icon === 'string' && icon.startsWith('http')) {
+                       iconElement = React.createElement('img', {
+                           src: icon,
+                           alt: text,
+                           className: `h-5 w-5 flex-shrink-0 object-contain ${!isSidebarCollapsed && 'mr-3'}`
+                       });
+                   } else {
+                       iconElement = React.createElement(LucideIcon, {
+                           name: icon,
+                           className: `h-5 w-5 flex-shrink-0 ${!isSidebarCollapsed && 'mr-3'}`
+                       });
+                   }
+
+                   return React.createElement('li', null,
+                       React.createElement('button', {
+                           onClick: () => { setCurrentPage(page); setIsSidebarOpen(false); },
+                           className: `flex items-center w-full px-4 py-2 rounded-lg transition-colors ${isSidebarCollapsed ? 'justify-center' : ''} ${isActive ? 'bg-blue-600 text-white' : 'hover:bg-gray-700 text-gray-300'}`
+                       },
+                           iconElement,
+                           !isSidebarCollapsed && React.createElement('span', {className: 'truncate'}, text)
+                       )
+                    );
+                };
+                
+                const MenuCategory = ({ title, icon, children, menuKey }) => {
+                    const isOpen = openMenu === menuKey;
+                    let iconElement;
+
+                    if (typeof icon === 'string' && icon.startsWith('http')) {
+                         iconElement = React.createElement('img', {
+                             src: icon,
+                             alt: title,
+                             className: `h-5 w-5 flex-shrink-0 object-contain ${!isSidebarCollapsed && 'mr-3'}`
+                         });
+                    } else {
+                         iconElement = React.createElement(LucideIcon, {
+                             name: icon,
+                             className: `h-5 w-5 flex-shrink-0 ${!isSidebarCollapsed && 'mr-3'}`
+                         });
+                    }
+
+                    return (
+                        React.createElement('li', { className: "mb-2" },
+                            React.createElement('button', {
+                                onClick: () => toggleMenu(menuKey),
+                                className: `flex items-center w-full px-4 py-2 rounded-lg transition-colors ${isSidebarCollapsed ? 'justify-center' : ''} ${!isSidebarCollapsed ? 'justify-between' : ''} ${isOpen && !isSidebarCollapsed ? 'bg-gray-700' : 'hover:bg-gray-700'} text-gray-200`
+                            },
+                                React.createElement('span', {className: 'flex items-center truncate'},
+                                    iconElement,
+                                    !isSidebarCollapsed && React.createElement('span', {className: 'truncate'}, title)
+                                ),
+                                !isSidebarCollapsed && React.createElement(LucideIcon, { name: isOpen ? "ChevronUp" : "ChevronDown", className: "h-5 w-5 flex-shrink-0" })
+                            ),
+                            !isSidebarCollapsed && isOpen && React.createElement('ul', { className: "ml-4 mt-2 space-y-2 border-l border-gray-700 pl-4" }, children)
+                        )
+                    );
+                };
+
+                return (
+                    React.createElement('div', { className: "flex min-h-screen bg-gray-100" },
+                        React.createElement('aside', { className: `fixed inset-y-0 left-0 bg-gray-800 text-white p-4 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:relative md:translate-x-0 transition-all duration-300 z-30 flex flex-col ${isSidebarCollapsed ? 'w-24' : 'w-72'}` },
+                            React.createElement('div', { className: "flex items-center justify-center mb-8" },
+                                React.createElement('img', { 
+                                    src: "https://ikypygpbdmoxozfmwewr.supabase.co/storage/v1/object/sign/logo/LOGO_TERSYS-removebg-preview%20(1)%20(1).png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9lMGJiMDk5Zi1jZmE5LTQ5Y2UtYjUwNy0wZmE2ZWZkYWYxOTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJsb2dvL0xPR09fVEVSU1lTLXJlbW92ZWJnLXByZXZpZXcgKDEpICgxKS5wbmciLCJpYXQiOjE3NTkyMzU4NTYsImV4cCI6MjA3NDU5NTg1Nn0.R8XPKzBUjrjR3kcJijIvDaCGpGMlvyMKA6lsqiSOcEQ", 
+                                    alt: "Logo", 
+                                    className: `cursor-pointer transition-all duration-300 ${isSidebarCollapsed ? 'h-12 w-auto' : 'h-16 w-auto'}`,
+                                    onClick: () => setCurrentPage('dashboard') 
+                                })
+                            ),
+                            React.createElement('nav', { className: "flex-grow" },
+                                React.createElement('ul', { className: "space-y-2" },
+                                    React.createElement(MenuItem, { page: 'dashboard', icon: 'LayoutDashboard', text: 'Dashboard' }),
+                                    React.createElement(MenuCategory, { title: "Importação", icon: "PlusCircle", menuKey: "importacao" },
+                                        React.createElement(MenuItem, { page: 'ticketAbastecimentos', icon: ticketIconUrl, text: 'Abastecimentos' }),
+                                        React.createElement(MenuItem, { page: 'ctaAbastecimentos', icon: ctaIconUrl, text: 'Abastecimentos' }),
+                                        React.createElement(MenuItem, { page: 'ctaCarregamentos', icon: ctaIconUrl, text: 'Carregamentos' }),
+                                        React.createElement(MenuItem, { page: 'shellAbastecimentos', icon: shellIconUrl, text: 'Abastecimentos' })
+                                    ),
+                                    React.createElement(MenuCategory, { title: "Operacional", icon: "Settings", menuKey: "operacional" },
+                                        React.createElement(MenuItem, { page: 'alertas', icon: 'FileText', text: 'Painel de Alertas' }),
+                                        React.createElement(MenuItem, { page: 'afericoes', icon: 'Tank', text: 'Aferições e Perdas' }),
+                                        React.createElement(MenuItem, { page: 'analiseCustos', icon: 'Beaker', text: 'Análise de Custos' }),
+                                        React.createElement(MenuItem, { page: 'analiseEquipamentos', icon: 'Ship', text: 'Consumo por Equipamento' })
+                                    ),
+                                    user.nivel_permissao === 'administrador' && React.createElement(MenuCategory, { title: "Cadastros", icon: "FileText", menuKey: "cadastros" },
+                                        React.createElement(MenuItem, { page: 'cadastroFiliais', icon: 'Building', text: 'Filiais (DE/PARA)' }),
+                                        React.createElement(MenuItem, { page: 'mapeamentoCombustivel', icon: 'Fuel', text: 'DE/PARA Combustível' }),
+                                        React.createElement(MenuItem, { page: 'cadastroAlertas', icon: 'Settings', text: 'Tipos de Alerta' }),
+                                        React.createElement(MenuItem, { page: 'userManagement', icon: 'Users', text: 'Usuários' })
+                                    )
+                                )
+                            ),
+                            React.createElement('div', {className: 'mt-auto pt-4 border-t border-gray-700'},
+                                React.createElement('button', { 
+                                    onClick: toggleSidebarCollapse, 
+                                    className: "w-full flex items-center p-3 rounded-lg text-gray-400 hover:bg-gray-700 justify-center mb-2" 
+                                },
+                                    React.createElement(LucideIcon, { name: isSidebarCollapsed ? "ChevronsRight" : "ChevronsLeft", className: "w-6 h-6" })
+                                ),
+                                React.createElement('button', { 
+                                    onClick: handleLogout, 
+                                    className: `w-full flex items-center p-3 rounded-lg text-red-400 hover:bg-gray-700 ${isSidebarCollapsed ? 'justify-center' : ''}` 
+                                },
+                                    React.createElement(LucideIcon, { name: "LogOut", className: `w-6 h-6 ${!isSidebarCollapsed && 'mr-3'}` }),
+                                    !isSidebarCollapsed && 'Sair'
+                                )
+                            )
+                        ),
+                        React.createElement('main', { className: "flex-1 p-4 md:p-8 flex flex-col" },
+                            React.createElement('header', { className: "w-full bg-white p-4 rounded-xl shadow-lg mb-8 flex justify-between items-center" },
+                                React.createElement('button', { className: "md:hidden text-gray-700 p-2", onClick: () => setIsSidebarOpen(true) }, React.createElement(LucideIcon, { name: "Menu" })),
+                                React.createElement('div', { className: "text-right text-sm text-gray-600" },
+                                    React.createElement('p', null, "Usuário: ", React.createElement('strong', null, user.nome)),
+                                    React.createElement('p', {className: "capitalize"}, "Permissão: ", React.createElement('strong', null, user.nivel_permissao))
+                                )
+                            ),
+                            React.createElement('div', { className: "flex-grow" }, renderPage()),
+                            toast.show && React.createElement(Toast, { message: toast.message, type: toast.type, onClose: closeToast })
+                        )
+                    )
+                );
+            }
             function Dashboard({ user, showToast, setCurrentPage }) {
                 const [stats, setStats] = React.useState({ Alta: 0, Média: 0, Baixa: 0, total: 0 });
                 const [chartData, setChartData] = React.useState({ overTime: null, byType: null });
