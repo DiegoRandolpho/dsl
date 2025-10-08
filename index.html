@@ -1500,7 +1500,8 @@
                        iconElement = React.createElement('img', {
                            src: icon,
                            alt: text,
-                           className: `h-5 w-5 flex-shrink-0 ${!isSidebarCollapsed && 'mr-3'}`
+                           // AJUSTE: Adicionada a classe 'object-contain'
+                           className: `h-5 w-5 flex-shrink-0 object-contain ${!isSidebarCollapsed && 'mr-3'}`
                        });
                    } else {
                        iconElement = React.createElement(LucideIcon, {
@@ -1528,7 +1529,8 @@
                          iconElement = React.createElement('img', {
                              src: icon,
                              alt: title,
-                             className: `h-5 w-5 flex-shrink-0 ${!isSidebarCollapsed && 'mr-3'}`
+                             // AJUSTE: Adicionada a classe 'object-contain'
+                             className: `h-5 w-5 flex-shrink-0 object-contain ${!isSidebarCollapsed && 'mr-3'}`
                          });
                     } else {
                          iconElement = React.createElement(LucideIcon, {
