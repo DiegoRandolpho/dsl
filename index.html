@@ -603,7 +603,15 @@
                                 supabase.from('alertas').select('*').eq('placa', placa).order('data_criacao', { ascending: false })
                             ]);
 
-                            if (eqError) console.error("Erro ao buscar detalhes do equipamento:", eqError);
+                            // Verificação individual de cada resposta da API
+                            if (eqRes.error && eqRes.error.code !== 'PGRST116') { // PGRST116 = "o resultado não contém exatamente uma linha", o que é ok se a placa não existir
+                                throw new Error(`Erro ao buscar equipamento: ${eqRes.error.message}`);
+                            }
+                            if (ticketRes.error) throw new Error(`Erro ao buscar abastecimentos Ticket: ${ticketRes.error.message}`);
+                            if (shellRes.error) throw new Error(`Erro ao buscar abastecimentos Shell: ${shellRes.error.message}`);
+                            if (ctaRes.error) throw new Error(`Erro ao buscar abastecimentos CTA: ${ctaRes.error.message}`);
+                            if (alertasRes.error) throw new Error(`Erro ao buscar alertas: ${alertasRes.error.message}`);
+
                             setVeiculo(eqRes.data || { type: 'N/A', brand: 'N/A', model: 'N/A' });
 
                             const todosAbastecimentos = [
@@ -616,14 +624,19 @@
                             setAlertas(alertasRes.data || []);
 
                         } catch (err) {
-                            showToast("Erro ao carregar perfil do veículo.", "error");
+                            // MUDANÇA PRINCIPAL: Agora o erro detalhado será exibido no console
+                            console.error("Erro detalhado ao carregar perfil do veículo:", err);
+                            showToast("Erro ao carregar perfil. Verifique o console.", "error");
+                        } finally {
+                            // Garante que o "carregando" sempre termine
+                            setIsLoading(false);
                         }
-                        setIsLoading(false);
                     };
                     fetchData();
                 }, [placa, showToast]);
 
                 const stats = React.useMemo(() => {
+                    if (!abastecimentos) return {};
                     const custoTotal = abastecimentos.reduce((sum, a) => sum + (a.valor_emissao || a.total_abastecimento || a.custo_total || 0), 0);
                     const volumeTotal = abastecimentos.reduce((sum, a) => sum + (a.litros || a.volume || 0), 0);
                     return {
@@ -635,7 +648,8 @@
                 }, [abastecimentos]);
                 
                 const chartData = React.useMemo(() => {
-                    const ultimosAbastecimentos = abastecimentos.slice(0, 12).reverse(); // Pega os últimos 12 e inverte para ordem cronológica
+                    if (!abastecimentos) return null;
+                    const ultimosAbastecimentos = abastecimentos.slice(0, 12).reverse();
                     return {
                         labels: ultimosAbastecimentos.map(a => new Date(a.data_transacao || a.data_hora_transacao || a.data_hora_inicio).toLocaleDateString('pt-BR')),
                         datasets: [{
@@ -656,10 +670,12 @@
                     };
                 }, [abastecimentos]);
 
-                if (isLoading) return React.createElement('p', null, 'Carregando perfil do veículo...');
+                if (isLoading) {
+                    return React.createElement('p', {className: "text-center p-10 font-semibold text-blue-600"}, 'Carregando perfil do veículo...');
+                }
 
                 return React.createElement('div', null,
-                    React.createElement('button', { onClick: onBack, className: 'flex items-center gap-2 text-sm font-semibold text-blue-600 mb-6 hover:underline' }, React.createElement(LucideIcon, { name: 'ChevronsLeft' }), 'Voltar para Análise'),
+                    React.createElement('button', { onClick: onBack, className: 'flex items-center gap-2 text-sm font-semibold text-blue-600 mb-6 hover:underline' }, React.createElement(LucideIcon, { name: 'ChevronsLeft' }), 'Voltar'),
                     React.createElement('div', { className: 'bg-white p-6 rounded-xl shadow-lg' },
                         React.createElement('h2', { className: "text-3xl font-bold text-gray-800" }, `Perfil do Veículo: ${placa}`),
                         React.createElement('p', { className: 'text-gray-500' }, `${veiculo.type} ${veiculo.brand} ${veiculo.model}`),
@@ -681,7 +697,7 @@
                             React.createElement('div', null,
                                 React.createElement('h3', { className: 'font-semibold mb-2' }, 'Histórico de Alertas'),
                                 React.createElement('div', { className: 'space-y-2 max-h-80 overflow-y-auto bg-gray-50 p-2 rounded-lg' },
-                                    alertas.length === 0 ? React.createElement('p', {className: 'p-4 text-sm text-center'}, 'Nenhum alerta para este veículo.') :
+                                    !alertas || alertas.length === 0 ? React.createElement('p', {className: 'p-4 text-sm text-center'}, 'Nenhum alerta para este veículo.') :
                                     alertas.map(alerta => React.createElement('div', { key: alerta.id, className: `p-2 rounded text-sm ${alerta.status === 'pendente' ? 'bg-yellow-100 border-l-4 border-yellow-500' : 'bg-green-100'}` }, 
                                         React.createElement('p', {className: 'font-semibold'}, alerta.tipo_alerta),
                                         React.createElement('p', {className: 'text-xs'}, `Período: ${alerta.periodo} - Status: ${alerta.status}`)
