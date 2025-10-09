@@ -1440,11 +1440,16 @@
                 const mapRef = React.useRef(null);
                 const mapInstance = React.useRef(null);
 
+                // Adicionamos a função ao escopo global para ser acessível pelo popup do mapa
+                window.viewPlacaProfile = (placa) => {
+                    onViewPlaca(placa);
+                };
+
                 React.useEffect(() => {
                     const fetchData = async () => {
                         setIsLoading(true);
                         try {
-                            // 1. Busca todos os dados de abastecimento E o DE/PARA de filiais
+                            setLoadingMessage('Buscando dados de abastecimento...');
                             const [ticketRes, shellRes, ctaRes, filiaisRes] = await Promise.all([
                                 supabase.from('ticket_abastecimentos').select('cidade, placa, valor_emissao, litros'),
                                 supabase.from('shell_abastecimentos').select('cidade, placa, total_abastecimento, litros'),
@@ -1454,13 +1459,11 @@
 
                             if (ticketRes.error || shellRes.error || ctaRes.error || filiaisRes.error) throw new Error("Falha ao buscar dados de abastecimento.");
                             
-                            // Cria um mapa para encontrar a cidade pelo cod_posto do CTA
                             const postoCidadeMap = new Map(filiaisRes.data.map(f => [f.cta_cod_posto, f.nome_filial]));
 
                             const todosAbastecimentos = [
                                 ...(ticketRes.data || []).map(a => ({ cidade: a.cidade, placa: a.placa, custo: a.valor_emissao, volume: a.litros })),
                                 ...(shellRes.data || []).map(a => ({ cidade: a.cidade, placa: a.placa, custo: a.total_abastecimento, volume: a.litros })),
-                                // USA O MAPA PARA ENRIQUECER OS DADOS DO CTA COM A CIDADE
                                 ...(ctaRes.data || []).map(a => ({ cidade: postoCidadeMap.get(a.cod_posto), placa: a.placa, custo: a.custo_total, volume: a.volume }))
                             ];
 
@@ -1471,7 +1474,7 @@
                                 acc[cidade].custoTotal += abs.custo;
                                 acc[cidade].volumeTotal += abs.volume;
                                 acc[cidade].count++;
-                                acc[cidade].placas.add(abs.placa);
+                                if(abs.placa) acc[cidade].placas.add(abs.placa);
                                 return acc;
                             }, {});
 
@@ -1479,40 +1482,50 @@
                                 cidade, ...dados, precoMedio: dados.custoTotal / dados.volumeTotal || 0
                             }));
                             
-                            // --- NOVA LÓGICA DE CACHE DE COORDENADAS ---
-                            setLoadingMessage('Buscando coordenadas das cidades...');
+                            setLoadingMessage('Verificando cache de coordenadas...');
                             const cidadesParaBuscar = resultado.map(r => r.cidade);
                             
-                            // Busca no nosso cache primeiro
                             const { data: cidadesEmCache } = await supabase.from('cidades_coordenadas').select('*').in('cidade', cidadesParaBuscar);
                             const cacheMap = new Map(cidadesEmCache.map(c => [c.cidade, { lat: c.lat, lon: c.lon }]));
                             
                             const cidadesSemCoordenadas = resultado.filter(r => !cacheMap.has(r.cidade));
                             const novasCoordenadasParaSalvar = [];
+                            const comCoordenadas = resultado.map(item => cacheMap.has(item.cidade) ? { ...item, ...cacheMap.get(item.cidade) } : item);
 
-                            const comCoordenadas = await Promise.all(resultado.map(async (item) => {
-                                if (cacheMap.has(item.cidade)) {
-                                    return { ...item, ...cacheMap.get(item.cidade) };
+                            // --- INÍCIO DA LÓGICA DE BUSCA SEQUENCIAL ---
+                            if (cidadesSemCoordenadas.length > 0) {
+                                let count = 0;
+                                for (const item of cidadesSemCoordenadas) {
+                                    count++;
+                                    setLoadingMessage(`Buscando coordenadas: ${count} de ${cidadesSemCoordenadas.length} cidades novas...`);
+                                    
+                                    try {
+                                        const response = await fetch(`https://nominatim.openstreetmap.org/search?city=${encodeURIComponent(item.cidade)}&country=Brazil&format=json&limit=1`);
+                                        if (!response.ok) continue;
+                                        const geodata = await response.json();
+                                        if (geodata && geodata.length > 0) {
+                                            const coords = { lat: geodata[0].lat, lon: geodata[0].lon };
+                                            const index = comCoordenadas.findIndex(c => c.cidade === item.cidade);
+                                            if (index !== -1) {
+                                                comCoordenadas[index].lat = coords.lat;
+                                                comCoordenadas[index].lon = coords.lon;
+                                            }
+                                            novasCoordenadasParaSalvar.push({ cidade: item.cidade, ...coords });
+                                        }
+                                    } catch (e) { console.error("Erro de geocodificação para", item.cidade, e); }
+                                    
+                                    // Pausa de 1 segundo para respeitar o limite da API
+                                    await new Promise(resolve => setTimeout(resolve, 1000));
                                 }
-                                try {
-                                    const response = await fetch(`https://nominatim.openstreetmap.org/search?city=${encodeURIComponent(item.cidade)}&country=Brazil&format=json&limit=1`);
-                                    if (!response.ok) return { ...item, lat: null, lon: null };
-                                    const geodata = await response.json();
-                                    if (geodata && geodata.length > 0) {
-                                        const coords = { lat: geodata[0].lat, lon: geodata[0].lon };
-                                        novasCoordenadasParaSalvar.push({ cidade: item.cidade, ...coords });
-                                        return { ...item, ...coords };
-                                    }
-                                } catch (e) { console.error("Erro de geocodificação para", item.cidade, e); }
-                                return { ...item, lat: null, lon: null };
-                            }));
+                            }
+                            // --- FIM DA LÓGICA DE BUSCA SEQUENCIAL ---
 
-                            // Salva as novas coordenadas encontradas no nosso cache para uso futuro
                             if (novasCoordenadasParaSalvar.length > 0) {
+                                setLoadingMessage('Salvando novas coordenadas no cache...');
                                 await supabase.from('cidades_coordenadas').insert(novasCoordenadasParaSalvar).select();
                             }
                             
-                            setDadosPorCidade(comCoordenadas.filter(c => c.lat));
+                            setDadosPorCidade(comCoordenadas.filter(c => c.lat && c.lon));
 
                         } catch (err) {
                             showToast("Erro ao carregar dados geográficos.", "error");
@@ -1538,9 +1551,9 @@
 
                     dadosPorCidade.forEach(cidade => {
                         const getColor = (preco) => {
-                            if (preco > 6.0) return '#EF4444'; // red-500
-                            if (preco > 5.5) return '#F59E0B'; // amber-500
-                            return '#22C55E'; // green-500
+                            if (preco > 6.0) return '#EF4444';
+                            if (preco > 5.5) return '#F59E0B';
+                            return '#22C55E';
                         };
                         const circle = L.circleMarker([cidade.lat, cidade.lon], {
                             radius: 5 + Math.log(cidade.volumeTotal + 1),
@@ -1559,7 +1572,7 @@
                 return React.createElement('div', { className: 'bg-white p-6 rounded-xl shadow-lg' },
                     React.createElement('h2', { className: "text-2xl font-bold text-gray-800 mb-2 text-center" }, "Mapa de Custos por Cidade"),
                     React.createElement('p', { className: 'text-center text-gray-500 mb-6' }, 'Visualize o preço médio (cor) e o volume total (tamanho) por cidade.'),
-                    isLoading ? React.createElement('p', {className: 'text-center p-10'}, loadingMessage) :
+                    isLoading ? React.createElement('p', {className: 'text-center p-10 font-semibold text-blue-600'}, loadingMessage) :
                     React.createElement('div', { ref: mapRef, style: { height: '600px', width: '100%', borderRadius: '8px', zIndex: 0 } })
                 );
             }
