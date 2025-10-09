@@ -1522,60 +1522,68 @@
         );
     };
     
-    const fetchData = async () => {
+    // VERSÃO DE DEPURAÇÃO - SUBSTITUA A SUA FUNÇÃO fetchData POR ESTA:
+const fetchData = async () => {
     if (dateRange.length !== 2) {
         showToast("Por favor, selecione um período para a análise.", "info");
         return;
     }
     setIsLoading(true);
     setDadosPorCidade([]);
+    console.clear(); // Limpa o console para uma nova análise
+    console.log("--- INICIANDO ANÁLISE GEOGRÁFICA ---");
+
     try {
         const [inicio, fim] = dateRange;
         const fimAjustado = new Date(fim);
         fimAjustado.setHours(23, 59, 59);
 
-        // --- INÍCIO DA MUDANÇA ---
-
+        // --- ETAPA 1: BUSCA DE DADOS ---
         setLoadingMessage('Buscando dados da Ticket...');
+        console.log("Filtros selecionados:", selectedPlataformas);
         const ticketRes = await (selectedPlataformas.includes('Ticket')
             ? supabase.from('ticket_abastecimentos').select('cidade, uf, placa, valor_emissao, litros').gte('data_transacao', inicio.toISOString()).lte('data_transacao', fimAjustado.toISOString()).limit(10000)
             : Promise.resolve({ data: [], error: null }));
+        console.log(`Busca 'Ticket' concluída. Encontrados: ${ticketRes.data?.length || 0} registros.`);
 
         setLoadingMessage('Buscando dados da Shell...');
         const shellRes = await (selectedPlataformas.includes('Shell')
             ? supabase.from('shell_abastecimentos').select('cidade, estado, placa, total_abastecimento, litros').gte('data_hora_transacao', inicio.toISOString()).lte('data_hora_transacao', fimAjustado.toISOString()).limit(10000)
             : Promise.resolve({ data: [], error: null }));
+        console.log(`Busca 'Shell' concluída. Encontrados: ${shellRes.data?.length || 0} registros.`);
 
         setLoadingMessage('Buscando dados da CTA...');
         const ctaRes = await (selectedPlataformas.includes('CTA')
             ? supabase.from('cta_abastecimentos').select('cod_posto, placa, custo_total, volume').gte('data_hora_inicio', inicio.toISOString()).lte('data_hora_inicio', fimAjustado.toISOString()).limit(10000)
             : Promise.resolve({ data: [], error: null }));
+        console.log(`Busca 'CTA' concluída. Encontrados: ${ctaRes.data?.length || 0} registros.`);
 
         setLoadingMessage('Buscando dados de filiais...');
         const filiaisRes = await supabase.from('filiais').select('cta_cod_posto, nome_filial');
+        console.log(`Busca 'Filiais' concluída. Encontradas: ${filiaisRes.data?.length || 0}.`);
 
-        // --- FIM DA MUDANÇA ---
-
+        // --- ETAPA 2: VERIFICAÇÃO DE ERROS ---
         if (ticketRes.error || shellRes.error || ctaRes.error || filiaisRes.error) {
-            // Coleta todas as mensagens de erro para um diagnóstico claro
             const errorMessages = [ticketRes.error, shellRes.error, ctaRes.error, filiaisRes.error]
-                .filter(Boolean)
-                .map(e => e.message)
-                .join('; ');
+                .filter(Boolean).map(e => e.message).join('; ');
             throw new Error(`Falha ao buscar dados: ${errorMessages}`);
         }
         
+        // --- ETAPA 3: COMBINAÇÃO E PROCESSAMENTO DOS DADOS ---
+        console.log("Combinando e processando os dados...");
         const postoCidadeMap = new Map((filiaisRes.data || []).map(f => [f.cta_cod_posto, f.nome_filial]));
         const todosAbastecimentos = [
             ...(ticketRes.data || []).map(a => ({ cidade: a.cidade && a.uf ? `${a.cidade.trim()} - ${a.uf.trim()}` : a.cidade, placa: a.placa, custo: a.valor_emissao, volume: a.litros })),
             ...(shellRes.data || []).map(a => ({ cidade: a.cidade && a.estado ? `${a.cidade.trim()} - ${a.estado.trim()}` : a.cidade, placa: a.placa, custo: a.total_abastecimento, volume: a.litros })),
             ...(ctaRes.data || []).map(a => ({ cidade: postoCidadeMap.get(a.cod_posto), placa: a.placa, custo: a.custo_total, volume: a.volume }))
         ];
+        console.log(`Total de ${todosAbastecimentos.length} abastecimentos combinados.`);
 
         if (todosAbastecimentos.length === 0) {
             showToast("Nenhum abastecimento encontrado para os filtros selecionados.", "info");
             setIsLoading(false);
             setDadosPorCidade([]);
+            console.log("--- ANÁLISE FINALIZADA: Nenhum dado encontrado. ---");
             return;
         }
 
@@ -1592,11 +1600,14 @@
             }
             return acc;
         }, {});
+        console.log("Dados agregados por cidade:", agregados);
 
         const resultado = Object.entries(agregados).map(([cidade, dados]) => ({
             cidade, ...dados, precoMedio: dados.custoTotal / dados.volumeTotal || 0
         }));
-
+        console.log("Resultado final antes da geocodificação:", resultado);
+        
+        // ... O resto da função (geocodificação) continua igual ...
         setLoadingMessage('Verificando cache de coordenadas...');
         const cidadesParaBuscar = resultado.map(r => r.cidade);
         const { data: cidadesEmCache } = await supabase.from('cidades_coordenadas').select('*').in('cidade', cidadesParaBuscar);
@@ -1634,11 +1645,14 @@
             await supabase.from('cidades_coordenadas').insert(novasCoordenadasParaSalvar).select();
         }
         
+        console.log("Definindo estado final com os dados para o mapa.");
         setDadosPorCidade(comCoordenadas.filter(c => c.lat && c.lon));
     } catch (err) {
+        console.error("--- ERRO DETALHADO NA FUNÇÃO fetchData ---", err);
         showToast(err.message, "error");
     }
     setIsLoading(false);
+    console.log("--- ANÁLISE FINALIZADA ---");
 };
 
     React.useEffect(() => {
