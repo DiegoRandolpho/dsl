@@ -1564,7 +1564,6 @@
                 return;
             }
 
-            // AGREGAÇÃO MODIFICADA
             const agregados = todosAbastecimentos.reduce((acc, abs) => {
                 if (!abs.cidade || !abs.custo || !abs.volume) return acc;
                 const cidade = abs.cidade.trim().toUpperCase();
@@ -1636,7 +1635,6 @@
         }
     }, []);
 
-    // USE EFFECT MODIFICADO
     React.useEffect(() => {
         if (mapInstance.current) {
             const map = mapInstance.current;
@@ -1657,7 +1655,6 @@
                         color: '#000', weight: 1, opacity: 1, fillOpacity: 0.8
                     }).addTo(map);
                     
-                    // LÓGICA DE AMOSTRAGEM CORRIGIDA
                     const placasOrdenadas = Array.from(cidade.placas.entries())
                         .sort((a, b) => b[1] - a[1])
                         .slice(0, 5)
