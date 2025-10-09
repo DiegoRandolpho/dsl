@@ -1550,8 +1550,6 @@ if (selectedPlataformas.includes('Shell')) queries.push(supabase.from('shell_aba
                         if (ticketRes.error || shellRes.error || ctaRes.error || filiaisRes.error) throw new Error("Falha ao buscar dados de abastecimento.");
                         
                         const postoCidadeMap = new Map(filiaisRes.data.map(f => [f.cta_cod_posto, f.nome_filial]));
-                        const todosAbastecimentos = [
-                            const postoCidadeMap = new Map(filiaisRes.data.map(f => [f.cta_cod_posto, f.nome_filial]));
 const todosAbastecimentos = [
     ...(ticketRes.data || []).map(a => ({ 
         cidade: a.cidade && a.uf ? `${a.cidade.trim()} - ${a.uf.trim()}` : a.cidade, 
@@ -1561,12 +1559,12 @@ const todosAbastecimentos = [
     })),
     ...(shellRes.data || []).map(a => ({ 
         cidade: a.cidade && a.estado ? `${a.cidade.trim()} - ${a.estado.trim()}` : a.cidade, 
-        placa: a.placa, 
+        [cite_start]placa: a.placa, // [cite: 474]
         custo: a.total_abastecimento, 
         volume: a.litros 
     })),
-                            ...(ctaRes.data || []).map(a => ({ cidade: postoCidadeMap.get(a.cod_posto), placa: a.placa, custo: a.custo_total, volume: a.volume }))
-                        ];
+    ...(ctaRes.data || []).map(a => ({ cidade: postoCidadeMap.get(a.cod_posto), placa: a.placa, custo: a.custo_total, volume: a.volume }))
+];
 
                         if (todosAbastecimentos.length === 0) {
                             showToast("Nenhum abastecimento encontrado para os filtros selecionados.", "info");
