@@ -1430,7 +1430,7 @@
 
             function AnaliseGeografica({ user, showToast, onViewPlaca }) {
                 const [dadosPorCidade, setDadosPorCidade] = React.useState([]);
-                const [isLoading, setIsLoading] = React.useState(true);
+                const [isLoading, setIsLoading] = React.useState(false);
                 const [loadingMessage, setLoadingMessage] = React.useState('Selecione os filtros e clique em "Analisar" para carregar o mapa.');
                 const mapRef = React.useRef(null);
                 const mapInstance = React.useRef(null);
