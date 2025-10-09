@@ -2763,7 +2763,7 @@ function ShellAbastecimentos({ user, showToast }) {
                         const { data: alertasData, error: alertasError } = await supabase
                             .from('alertas')
                             .select('*, alerta_prioridades ( prioridade, cor_badge )')
-                            .order('data_criacao', { ascending: false });
+                            .order('data_criacao', { ascending: false })
                             .limit(10000);
 
                         if (alertasError) throw alertasError;
