@@ -896,11 +896,24 @@
                         const [inicioA, fimA] = periodoA;
                         const [inicioB, fimB] = periodoB;
 
-                        const [ticketRes, shellRes, ctaRes] = await Promise.all([
-                            supabase.from('ticket_abastecimentos').select('valor_emissao, litros, data_transacao').limit(10000), // LIMITE AUMENTADO
-                            supabase.from('shell_abastecimentos').select('total_abastecimento, litros, data_hora_transacao').limit(10000), // LIMITE AUMENTADO
-                            supabase.from('cta_abastecimentos').select('custo_total, volume, data_hora_inicio').limit(10000) // LIMITE AUMENTADO
-                        ]);
+                        const dataMinima = inicioA;
+const dataMaxima = new Date(fimB);
+dataMaxima.setHours(23, 59, 59);
+
+const [ticketRes, shellRes, ctaRes] = await Promise.all([
+    supabase.from('ticket_abastecimentos').select('valor_emissao, litros, data_transacao')
+        .gte('data_transacao', dataMinima.toISOString())
+        .lte('data_transacao', dataMaxima.toISOString())
+        .limit(10000),
+    supabase.from('shell_abastecimentos').select('total_abastecimento, litros, data_hora_transacao')
+        .gte('data_hora_transacao', dataMinima.toISOString())
+        .lte('data_hora_transacao', dataMaxima.toISOString())
+        .limit(10000),
+    supabase.from('cta_abastecimentos').select('custo_total, volume, data_hora_inicio')
+        .gte('data_hora_inicio', dataMinima.toISOString())
+        .lte('data_hora_inicio', dataMaxima.toISOString())
+        .limit(10000)
+]);
 
                         if (ticketRes.error || shellRes.error || ctaRes.error) throw new Error("Falha ao buscar dados de abastecimento.");
 
