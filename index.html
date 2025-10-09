@@ -1435,106 +1435,145 @@
             }
             function AnaliseGeografica({ user, showToast, onViewPlaca }) {
                 const [dadosPorCidade, setDadosPorCidade] = React.useState([]);
-                const [isLoading, setIsLoading] = React.useState(true);
-                const [loadingMessage, setLoadingMessage] = React.useState('Analisando dados...');
+                const [isLoading, setIsLoading] = React.useState(false);
+                const [loadingMessage, setLoadingMessage] = React.useState('Selecione os filtros e clique em "Analisar" para carregar o mapa.');
                 const mapRef = React.useRef(null);
                 const mapInstance = React.useRef(null);
+
+                // --- NOVOS ESTADOS PARA OS FILTROS ---
+                const [dateRange, setDateRange] = React.useState([]);
+                const [selectedPlataformas, setSelectedPlataformas] = React.useState(['Ticket', 'Shell', 'CTA']);
 
                 // Adicionamos a função ao escopo global para ser acessível pelo popup do mapa
                 window.viewPlacaProfile = (placa) => {
                     onViewPlaca(placa);
                 };
 
-                React.useEffect(() => {
-                    const fetchData = async () => {
-                        setIsLoading(true);
-                        try {
-                            setLoadingMessage('Buscando dados de abastecimento...');
-                            const [ticketRes, shellRes, ctaRes, filiaisRes] = await Promise.all([
-                                supabase.from('ticket_abastecimentos').select('cidade, placa, valor_emissao, litros'),
-                                supabase.from('shell_abastecimentos').select('cidade, placa, total_abastecimento, litros'),
-                                supabase.from('cta_abastecimentos').select('cod_posto, placa, custo_total, volume'),
-                                supabase.from('filiais').select('cta_cod_posto, nome_filial')
-                            ]);
-
-                            if (ticketRes.error || shellRes.error || ctaRes.error || filiaisRes.error) throw new Error("Falha ao buscar dados de abastecimento.");
-                            
-                            const postoCidadeMap = new Map(filiaisRes.data.map(f => [f.cta_cod_posto, f.nome_filial]));
-
-                            const todosAbastecimentos = [
-                                ...(ticketRes.data || []).map(a => ({ cidade: a.cidade, placa: a.placa, custo: a.valor_emissao, volume: a.litros })),
-                                ...(shellRes.data || []).map(a => ({ cidade: a.cidade, placa: a.placa, custo: a.total_abastecimento, volume: a.litros })),
-                                ...(ctaRes.data || []).map(a => ({ cidade: postoCidadeMap.get(a.cod_posto), placa: a.placa, custo: a.custo_total, volume: a.volume }))
-                            ];
-
-                            const agregados = todosAbastecimentos.reduce((acc, abs) => {
-                                if (!abs.cidade || !abs.custo || !abs.volume) return acc;
-                                const cidade = abs.cidade.trim().toUpperCase();
-                                acc[cidade] = acc[cidade] || { custoTotal: 0, volumeTotal: 0, count: 0, placas: new Set() };
-                                acc[cidade].custoTotal += abs.custo;
-                                acc[cidade].volumeTotal += abs.volume;
-                                acc[cidade].count++;
-                                if(abs.placa) acc[cidade].placas.add(abs.placa);
-                                return acc;
-                            }, {});
-
-                            const resultado = Object.entries(agregados).map(([cidade, dados]) => ({
-                                cidade, ...dados, precoMedio: dados.custoTotal / dados.volumeTotal || 0
-                            }));
-                            
-                            setLoadingMessage('Verificando cache de coordenadas...');
-                            const cidadesParaBuscar = resultado.map(r => r.cidade);
-                            
-                            const { data: cidadesEmCache } = await supabase.from('cidades_coordenadas').select('*').in('cidade', cidadesParaBuscar);
-                            const cacheMap = new Map(cidadesEmCache.map(c => [c.cidade, { lat: c.lat, lon: c.lon }]));
-                            
-                            const cidadesSemCoordenadas = resultado.filter(r => !cacheMap.has(r.cidade));
-                            const novasCoordenadasParaSalvar = [];
-                            const comCoordenadas = resultado.map(item => cacheMap.has(item.cidade) ? { ...item, ...cacheMap.get(item.cidade) } : item);
-
-                            // --- INÍCIO DA LÓGICA DE BUSCA SEQUENCIAL ---
-                            if (cidadesSemCoordenadas.length > 0) {
-                                let count = 0;
-                                for (const item of cidadesSemCoordenadas) {
-                                    count++;
-                                    setLoadingMessage(`Buscando coordenadas: ${count} de ${cidadesSemCoordenadas.length} cidades novas...`);
-                                    
-                                    try {
-                                        const response = await fetch(`https://nominatim.openstreetmap.org/search?city=${encodeURIComponent(item.cidade)}&country=Brazil&format=json&limit=1`);
-                                        if (!response.ok) continue;
-                                        const geodata = await response.json();
-                                        if (geodata && geodata.length > 0) {
-                                            const coords = { lat: geodata[0].lat, lon: geodata[0].lon };
-                                            const index = comCoordenadas.findIndex(c => c.cidade === item.cidade);
-                                            if (index !== -1) {
-                                                comCoordenadas[index].lat = coords.lat;
-                                                comCoordenadas[index].lon = coords.lon;
-                                            }
-                                            novasCoordenadasParaSalvar.push({ cidade: item.cidade, ...coords });
-                                        }
-                                    } catch (e) { console.error("Erro de geocodificação para", item.cidade, e); }
-                                    
-                                    // Pausa de 1 segundo para respeitar o limite da API
-                                    await new Promise(resolve => setTimeout(resolve, 1000));
-                                }
-                            }
-                            // --- FIM DA LÓGICA DE BUSCA SEQUENCIAL ---
-
-                            if (novasCoordenadasParaSalvar.length > 0) {
-                                setLoadingMessage('Salvando novas coordenadas no cache...');
-                                await supabase.from('cidades_coordenadas').insert(novasCoordenadasParaSalvar).select();
-                            }
-                            
-                            setDadosPorCidade(comCoordenadas.filter(c => c.lat && c.lon));
-
-                        } catch (err) {
-                            showToast("Erro ao carregar dados geográficos.", "error");
-                        }
-                        setIsLoading(false);
+                // Componente reutilizável para o seletor de plataformas
+                const PlataformaPicker = ({ onChange, selected }) => {
+                    const plataformas = ['Ticket', 'Shell', 'CTA'];
+                    const handleToggle = (p) => {
+                        const newSelection = new Set(selected);
+                        if (newSelection.has(p)) newSelection.delete(p);
+                        else newSelection.add(p);
+                        onChange(Array.from(newSelection));
                     };
+                    return React.createElement('div', { className: 'flex flex-wrap gap-2' },
+                        plataformas.map(p => React.createElement('button', {
+                            key: p,
+                            onClick: () => handleToggle(p),
+                            className: `px-3 py-1 text-sm rounded-full border ${selected.includes(p) ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 hover:bg-gray-100'}`
+                        }, p))
+                    );
+                };
+                
+                const fetchData = async () => {
+                    if (dateRange.length !== 2) {
+                        showToast("Por favor, selecione um período para a análise.", "info");
+                        return;
+                    }
+                    setIsLoading(true);
+                    try {
+                        const [inicio, fim] = dateRange;
+                        const fimAjustado = new Date(fim);
+                        fimAjustado.setHours(23, 59, 59);
 
-                    fetchData();
-                }, [showToast]);
+                        setLoadingMessage('Buscando dados de abastecimento...');
+                        const queries = [];
+                        if (selectedPlataformas.includes('Ticket')) {
+                            queries.push(supabase.from('ticket_abastecimentos').select('cidade, placa, valor_emissao, litros').gte('data_transacao', inicio.toISOString()).lte('data_transacao', fimAjustado.toISOString()));
+                        }
+                        if (selectedPlataformas.includes('Shell')) {
+                            queries.push(supabase.from('shell_abastecimentos').select('cidade, placa, total_abastecimento, litros').gte('data_hora_transacao', inicio.toISOString()).lte('data_hora_transacao', fimAjustado.toISOString()));
+                        }
+                        if (selectedPlataformas.includes('CTA')) {
+                            queries.push(supabase.from('cta_abastecimentos').select('cod_posto, placa, custo_total, volume').gte('data_hora_inicio', inicio.toISOString()).lte('data_hora_inicio', fimAjustado.toISOString()));
+                        }
+                        
+                        const [ticketRes, shellRes, ctaRes, filiaisRes] = await Promise.all([
+                            selectedPlataformas.includes('Ticket') ? queries.shift() : Promise.resolve({ data: [] }),
+                            selectedPlataformas.includes('Shell') ? queries.shift() : Promise.resolve({ data: [] }),
+                            selectedPlataformas.includes('CTA') ? queries.shift() : Promise.resolve({ data: [] }),
+                            supabase.from('filiais').select('cta_cod_posto, nome_filial')
+                        ]);
+
+                        if (ticketRes.error || shellRes.error || ctaRes.error || filiaisRes.error) throw new Error("Falha ao buscar dados de abastecimento.");
+                        
+                        const postoCidadeMap = new Map(filiaisRes.data.map(f => [f.cta_cod_posto, f.nome_filial]));
+
+                        const todosAbastecimentos = [
+                            ...(ticketRes.data || []).map(a => ({ cidade: a.cidade, placa: a.placa, custo: a.valor_emissao, volume: a.litros })),
+                            ...(shellRes.data || []).map(a => ({ cidade: a.cidade, placa: a.placa, custo: a.total_abastecimento, volume: a.litros })),
+                            ...(ctaRes.data || []).map(a => ({ cidade: postoCidadeMap.get(a.cod_posto), placa: a.placa, custo: a.custo_total, volume: a.volume }))
+                        ];
+
+                        if (todosAbastecimentos.length === 0) {
+                            setDadosPorCidade([]);
+                            throw new Error("Nenhum abastecimento encontrado para os filtros selecionados.");
+                        }
+
+                        const agregados = todosAbastecimentos.reduce((acc, abs) => {
+                            if (!abs.cidade || !abs.custo || !abs.volume) return acc;
+                            const cidade = abs.cidade.trim().toUpperCase();
+                            acc[cidade] = acc[cidade] || { custoTotal: 0, volumeTotal: 0, count: 0, placas: new Set() };
+                            acc[cidade].custoTotal += abs.custo;
+                            acc[cidade].volumeTotal += abs.volume;
+                            acc[cidade].count++;
+                            if(abs.placa) acc[cidade].placas.add(abs.placa);
+                            return acc;
+                        }, {});
+
+                        const resultado = Object.entries(agregados).map(([cidade, dados]) => ({
+                            cidade, ...dados, precoMedio: dados.custoTotal / dados.volumeTotal || 0
+                        }));
+                        
+                        setLoadingMessage('Verificando cache de coordenadas...');
+                        const cidadesParaBuscar = resultado.map(r => r.cidade);
+                        
+                        const { data: cidadesEmCache } = await supabase.from('cidades_coordenadas').select('*').in('cidade', cidadesParaBuscar);
+                        const cacheMap = new Map(cidadesEmCache.map(c => [c.cidade, { lat: c.lat, lon: c.lon }]));
+                        
+                        const cidadesSemCoordenadas = resultado.filter(r => !cacheMap.has(r.cidade));
+                        const novasCoordenadasParaSalvar = [];
+                        let comCoordenadas = resultado.map(item => cacheMap.has(item.cidade) ? { ...item, ...cacheMap.get(item.cidade) } : item);
+
+                        if (cidadesSemCoordenadas.length > 0) {
+                            let count = 0;
+                            for (const item of cidadesSemCoordenadas) {
+                                count++;
+                                setLoadingMessage(`Buscando coordenadas: ${count} de ${cidadesSemCoordenadas.length} cidades novas...`);
+                                
+                                try {
+                                    const response = await fetch(`https://nominatim.openstreetmap.org/search?city=${encodeURIComponent(item.cidade)}&country=Brazil&format=json&limit=1`);
+                                    if (!response.ok) continue;
+                                    const geodata = await response.json();
+                                    if (geodata && geodata.length > 0) {
+                                        const coords = { lat: geodata[0].lat, lon: geodata[0].lon };
+                                        const index = comCoordenadas.findIndex(c => c.cidade === item.cidade);
+                                        if (index !== -1) {
+                                            comCoordenadas[index].lat = coords.lat;
+                                            comCoordenadas[index].lon = coords.lon;
+                                        }
+                                        novasCoordenadasParaSalvar.push({ cidade: item.cidade, ...coords });
+                                    }
+                                } catch (e) { console.error("Erro de geocodificação para", item.cidade, e); }
+                                
+                                await new Promise(resolve => setTimeout(resolve, 1000));
+                            }
+                        }
+
+                        if (novasCoordenadasParaSalvar.length > 0) {
+                            setLoadingMessage('Salvando novas coordenadas no cache...');
+                            await supabase.from('cidades_coordenadas').insert(novasCoordenadasParaSalvar).select();
+                        }
+                        
+                        setDadosPorCidade(comCoordenadas.filter(c => c.lat && c.lon));
+
+                    } catch (err) {
+                        showToast(err.message, "error");
+                    }
+                    setIsLoading(false);
+                };
 
                 React.useEffect(() => {
                     if (isLoading || !mapRef.current) return;
@@ -1572,8 +1611,32 @@
                 return React.createElement('div', { className: 'bg-white p-6 rounded-xl shadow-lg' },
                     React.createElement('h2', { className: "text-2xl font-bold text-gray-800 mb-2 text-center" }, "Mapa de Custos por Cidade"),
                     React.createElement('p', { className: 'text-center text-gray-500 mb-6' }, 'Visualize o preço médio (cor) e o volume total (tamanho) por cidade.'),
-                    isLoading ? React.createElement('p', {className: 'text-center p-10 font-semibold text-blue-600'}, loadingMessage) :
-                    React.createElement('div', { ref: mapRef, style: { height: '600px', width: '100%', borderRadius: '8px', zIndex: 0 } })
+                    
+                    // --- NOVA BARRA DE FILTROS ---
+                    React.createElement('div', { className: 'grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 p-4 border rounded-lg bg-gray-50 items-end' },
+                        React.createElement('div', { className: 'md:col-span-2' },
+                            React.createElement('label', { className: 'block text-sm font-medium mb-1' }, 'Período de Análise'),
+                            React.createElement(DateRangePicker, { onDatesChange: setDateRange, placeholder: 'Selecione o período...' })
+                        ),
+                        React.createElement('div', null, 
+                            React.createElement('label', { className: 'block text-sm font-medium mb-1' }, 'Plataformas'),
+                            React.createElement(PlataformaPicker, { selected: selectedPlataformas, onChange: setSelectedPlataformas })
+                        ),
+                        React.createElement('div', { className: 'md:col-span-3' },
+                             React.createElement('button', { onClick: fetchData, disabled: isLoading, className: 'w-full p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400' },
+                                isLoading ? 'Analisando...' : 'Analisar'
+                            )
+                        )
+                    ),
+                    
+                    isLoading ? 
+                        React.createElement('div', { className: 'text-center p-10' }, 
+                            React.createElement('p', {className: 'font-semibold text-blue-600'}, loadingMessage),
+                            React.createElement('div', { className: 'w-full bg-gray-200 rounded-full h-2.5 mt-2'}, 
+                                React.createElement('div', { className: 'bg-blue-600 h-2.5 rounded-full animate-pulse' })
+                            )
+                        ) :
+                        React.createElement('div', { ref: mapRef, style: { height: '600px', width: '100%', borderRadius: '8px', zIndex: 0 } })
                 );
             }
             function Dashboard({ user, showToast, setCurrentPage }) {
