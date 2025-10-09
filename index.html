@@ -1045,9 +1045,9 @@
                         fimAjustado.setHours(23, 59, 59);
 
                         const [ticketRes, shellRes, ctaRes] = await Promise.all([
-                            supabase.from('ticket_abastecimentos').select('placa, litros').gte('data_transacao', inicio.toISOString()).lte('data_transacao', fimAjustado.toISOString()),
-                            supabase.from('shell_abastecimentos').select('placa, litros').gte('data_hora_transacao', inicio.toISOString()).lte('data_hora_transacao', fimAjustado.toISOString()),
-                            supabase.from('cta_abastecimentos').select('placa, volume').gte('data_hora_inicio', inicio.toISOString()).lte('data_hora_inicio', fimAjustado.toISOString())
+                            supabase.from('ticket_abastecimentos').select('placa, litros').gte('data_transacao', inicio.toISOString()).lte('data_transacao', fimAjustado.toISOString()).limit(10000), // LIMITE AUMENTADO
+                            supabase.from('shell_abastecimentos').select('placa, litros').gte('data_hora_transacao', inicio.toISOString()).lte('data_hora_transacao', fimAjustado.toISOString()).limit(10000), // LIMITE AUMENTADO
+                            supabase.from('cta_abastecimentos').select('placa, volume').gte('data_hora_inicio', inicio.toISOString()).lte('data_hora_inicio', fimAjustado.toISOString()).limit(10000) // LIMITE AUMENTADO
                         ]);
 
                         if (ticketRes.error || shellRes.error || ctaRes.error) throw new Error("Falha ao buscar dados de abastecimento.");
@@ -1537,10 +1537,9 @@
 
                         setLoadingMessage('Buscando dados de abastecimento...');
                         const queries = [];
-                        if (selectedPlataformas.includes('Ticket')) queries.push(supabase.from('ticket_abastecimentos').select('cidade, placa, valor_emissao, litros').gte('data_transacao', inicio.toISOString()).lte('data_transacao', fimAjustado.toISOString()));
-                        if (selectedPlataformas.includes('Shell')) queries.push(supabase.from('shell_abastecimentos').select('cidade, placa, total_abastecimento, litros').gte('data_hora_transacao', inicio.toISOString()).lte('data_hora_transacao', fimAjustado.toISOString()));
-                        if (selectedPlataformas.includes('CTA')) queries.push(supabase.from('cta_abastecimentos').select('cod_posto, placa, custo_total, volume').gte('data_hora_inicio', inicio.toISOString()).lte('data_hora_inicio', fimAjustado.toISOString()));
-                        
+                        if (selectedPlataformas.includes('Ticket')) queries.push(supabase.from('ticket_abastecimentos').select('cidade, placa, valor_emissao, litros').gte('data_transacao', inicio.toISOString()).lte('data_transacao', fimAjustado.toISOString()).limit(10000)); // LIMITE AUMENTADO
+                        if (selectedPlataformas.includes('Shell')) queries.push(supabase.from('shell_abastecimentos').select('cidade, placa, total_abastecimento, litros').gte('data_hora_transacao', inicio.toISOString()).lte('data_hora_transacao', fimAjustado.toISOString()).limit(10000)); // LIMITE AUMENTADO
+                        if (selectedPlataformas.includes('CTA')) queries.push(supabase.from('cta_abastecimentos').select('cod_posto, placa, custo_total, volume').gte('data_hora_inicio', inicio.toISOString()).lte('data_hora_inicio', fimAjustado.toISOString()).limit(10000)); // LIMITE AUMENTADO
                         const [ticketRes, shellRes, ctaRes, filiaisRes] = await Promise.all([
                             selectedPlataformas.includes('Ticket') ? queries.shift() || Promise.resolve({ data: [] }) : Promise.resolve({ data: [] }),
                             selectedPlataformas.includes('Shell') ? queries.shift() || Promise.resolve({ data: [] }) : Promise.resolve({ data: [] }),
