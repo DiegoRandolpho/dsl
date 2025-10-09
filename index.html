@@ -289,63 +289,64 @@
             }
 
             function Alertas({ user, showToast, onViewPlaca }) {
-    const [alertas, setAlertas] = React.useState([]); [cite: 83]
-    const [prioridades, setPrioridades] = React.useState(new Map()); [cite: 84]
-    const [isLoading, setIsLoading] = React.useState(true); [cite: 84]
-    const [filterStatus, setFilterStatus] = React.useState('pendente'); [cite: 84]
-    const [searchTerm, setSearchTerm] = React.useState(''); [cite: 85]
-    const [selectedPeriods, setSelectedPeriods] = React.useState([]); [cite: 85]
-    const [allPeriods, setAllPeriods] = React.useState([]); [cite: 85]
-    const [selectedAlerts, setSelectedAlerts] = React.useState(new Set()); [cite: 86]
-    const [detailedAlert, setDetailedAlert] = React.useState(null); [cite: 86]
-    const [detailedAbastecimentos, setDetailedAbastecimentos] = React.useState([]); [cite: 86]
-    const [isDetailLoading, setIsDetailLoading] = React.useState(false); [cite: 87]
-    const [showBulkObservacao, setShowBulkObservacao] = React.useState(false); [cite: 87]
-    const [bulkObservacao, setBulkObservacao] = React.useState(''); [cite: 87]
-    const [filterPrioridade, setFilterPrioridade] = React.useState('todas'); [cite: 87]
+    const [alertas, setAlertas] = React.useState([]);
+    const [prioridades, setPrioridades] = React.useState(new Map());
+    const [isLoading, setIsLoading] = React.useState(true);
+    const [filterStatus, setFilterStatus] = React.useState('pendente');
+    const [searchTerm, setSearchTerm] = React.useState('');
+    const [selectedPeriods, setSelectedPeriods] = React.useState([]);
+    const [allPeriods, setAllPeriods] = React.useState([]);
+    const [selectedAlerts, setSelectedAlerts] = React.useState(new Set());
+    const [detailedAlert, setDetailedAlert] = React.useState(null);
+    const [detailedAbastecimentos, setDetailedAbastecimentos] = React.useState([]);
+    const [isDetailLoading, setIsDetailLoading] = React.useState(false);
+    const [showBulkObservacao, setShowBulkObservacao] = React.useState(false);
+    const [bulkObservacao, setBulkObservacao] = React.useState('');
+    const [filterPrioridade, setFilterPrioridade] = React.useState('todas');
+
     const MultiPeriodoPicker = ({ allPeriods, selectedPeriods, onChange }) => {
-        const [isOpen, setIsOpen] = React.useState(false); [cite: 88]
-        const ref = React.useRef(null); [cite: 89]
+        const [isOpen, setIsOpen] = React.useState(false);
+        const ref = React.useRef(null);
 
         const handlePeriodToggle = (period) => {
-            const newSelection = new Set(selectedPeriods); [cite: 89]
-            if (newSelection.has(period)) { [cite: 90]
-                newSelection.delete(period); [cite: 90]
+            const newSelection = new Set(selectedPeriods);
+            if (newSelection.has(period)) {
+                newSelection.delete(period);
             } else {
-                newSelection.add(period); [cite: 91]
+                newSelection.add(period);
             }
-            onChange(Array.from(newSelection)); [cite: 92]
+            onChange(Array.from(newSelection));
         };
         
         React.useEffect(() => {
             const handleClickOutside = (event) => {
                 if (ref.current && !ref.current.contains(event.target)) {
-                    setIsOpen(false); [cite: 93]
+                    setIsOpen(false);
                 }
             };
-            document.addEventListener("mousedown", handleClickOutside); [cite: 94]
-            return () => 
-            document.removeEventListener("mousedown", handleClickOutside); [cite: 95]
+            document.addEventListener("mousedown", handleClickOutside);
+            return () => document.removeEventListener("mousedown", handleClickOutside);
         }, [ref]);
-        const displayLabel = selectedPeriods.length === 0 ? 'Selecione o(s) período(s)...' : [cite: 96]
-                                   selectedPeriods.length === 1 ? [cite: 96]
-        selectedPeriods[0] : [cite: 97]
-                                   `${selectedPeriods.length} períodos selecionados`; [cite: 97]
-        return React.createElement('div', { className: 'relative', ref: ref }, [cite: 98]
+
+        const displayLabel = selectedPeriods.length === 0 ? 'Selecione o(s) período(s)...' :
+                           selectedPeriods.length === 1 ? selectedPeriods[0] :
+                           `${selectedPeriods.length} períodos selecionados`;
+
+        return React.createElement('div', { className: 'relative', ref: ref },
             React.createElement('button', { onClick: () => setIsOpen(!isOpen), className: 'w-full p-2 border rounded bg-white text-left flex justify-between items-center' },
                 React.createElement('span', { className: 'truncate' }, displayLabel),
-                React.createElement(LucideIcon, { name: isOpen ? 'ChevronUp' : 'ChevronDown', className: 'h-5 w-5 text-gray-400' }) [cite: 99]
+                React.createElement(LucideIcon, { name: isOpen ? 'ChevronUp' : 'ChevronDown', className: 'h-5 w-5 text-gray-400' })
             ),
             isOpen && React.createElement('div', { className: 'absolute z-10 w-full mt-1 bg-white border rounded shadow-lg max-h-60 overflow-y-auto' },
-                allPeriods.map(period => [cite: 100]
+                allPeriods.map(period =>
                     React.createElement('label', { key: period, className: 'flex items-center p-2 hover:bg-gray-100 cursor-pointer' },
                         React.createElement('input', {
-                            type: 'checkbox', [cite: 101]
-                            className: 'h-4 w-4 mr-2', [cite: 101]
-                            checked: selectedPeriods.includes(period), [cite: 102]
-                            onChange: () => handlePeriodToggle(period) [cite: 102]
+                            type: 'checkbox',
+                            className: 'h-4 w-4 mr-2',
+                            checked: selectedPeriods.includes(period),
+                            onChange: () => handlePeriodToggle(period)
                         }),
-                        period [cite: 103]
+                        period
                     )
                 )
             )
@@ -353,239 +354,236 @@
     };
 
     const fetchAlertas = React.useCallback(async () => {
-        setIsLoading(true); [cite: 105]
+        setIsLoading(true);
         try {
             const { data: alertasData, error: alertasError } = await supabase
-                .from('alertas') [cite: 106]
-                .select('*, alerta_prioridades ( prioridade, cor_badge )') [cite: 106]
-                .order('data_criacao', { ascending: false }); [cite: 106]
+                .from('alertas')
+                .select('*, alerta_prioridades ( prioridade, cor_badge )')
+                .order('data_criacao', { ascending: false });
 
-            if (alertasError) 
-            throw alertasError; [cite: 107]
+            if (alertasError) throw alertasError;
             
-            const prioridadesMap = new Map(); [cite: 107]
+            const prioridadesMap = new Map();
             const alertasComPrioridade = alertasData.map(a => {
-                const tipoBase = a.tipo_alerta.startsWith('Combustível não mapeado') ? 'Combustível não mapeado' : a.tipo_alerta; [cite: 108]
-                const p = a.alerta_prioridades; [cite: 108]
+                const tipoBase = a.tipo_alerta.startsWith('Combustível não mapeado') ? 'Combustível não mapeado' : a.tipo_alerta;
+                const p = a.alerta_prioridades;
                 if (p && !prioridadesMap.has(tipoBase)) {
-                    prioridadesMap.set(tipoBase, { prioridade: p.prioridade, cor: p.cor_badge }); [cite: 109]
+                    prioridadesMap.set(tipoBase, { prioridade: p.prioridade, cor: p.cor_badge });
                 }
-                return { ...a, prioridadeInfo: p || [cite: 110]
-                null }; [cite: 111]
+                return { ...a, prioridadeInfo: p || null };
             });
             
-            setAlertas(alertasComPrioridade || []); [cite: 111]
-            setPrioridades(prioridadesMap); [cite: 111]
+            setAlertas(alertasComPrioridade || []);
+            setPrioridades(prioridadesMap);
 
-            const uniquePeriods = [...new Set(alertasData.map(a => a.periodo).filter(Boolean))]; [cite: 111]
-            uniquePeriods.sort((a, b) => { [cite: 112]
-                const [mesA, anoA] = a.split('/'); [cite: 112]
-                const [mesB, anoB] = b.split('/'); [cite: 112]
-                return new Date(anoB, mesB - [cite: 112]
-                1) - new Date(anoA, mesA - 1); [cite: 113]
+            const uniquePeriods = [...new Set(alertasData.map(a => a.periodo).filter(Boolean))];
+            uniquePeriods.sort((a, b) => {
+                const [mesA, anoA] = a.split('/');
+                const [mesB, anoB] = b.split('/');
+                return new Date(anoB, mesB - 1) - new Date(anoA, mesA - 1);
             });
-            setAllPeriods(uniquePeriods); [cite: 114]
+            setAllPeriods(uniquePeriods);
 
         } catch (err) {
-            showToast("Erro ao carregar dados.", "error"); [cite: 114]
+            showToast("Erro ao carregar dados.", "error");
         }
-        setIsLoading(false); [cite: 115]
+        setIsLoading(false);
     }, [showToast]);
 
     React.useEffect(() => {
-        fetchAlertas(); [cite: 116]
+        fetchAlertas();
     }, [fetchAlertas]);
-    const filteredAlerts = React.useMemo(() => { [cite: 117]
+
+    const filteredAlerts = React.useMemo(() => {
         return alertas.filter(alerta => {
-            const matchStatus = filterStatus === 'todos' || alerta.status === filterStatus; [cite: 117]
-            const matchSearch = !searchTerm || (alerta.placa && alerta.placa.toLowerCase().includes(searchTerm.toLowerCase())); [cite: 117]
-            const matchPeriod = selectedPeriods.length === 0 || selectedPeriods.includes(alerta.periodo); [cite: 118]
-            const matchPrioridade = filterPrioridade === 'todas' || alerta.prioridadeInfo?.prioridade === filterPrioridade; [cite: 118]
-            return matchStatus && matchSearch && matchPeriod && matchPrioridade; [cite: 118]
+            const matchStatus = filterStatus === 'todos' || alerta.status === filterStatus;
+            const matchSearch = !searchTerm || (alerta.placa && alerta.placa.toLowerCase().includes(searchTerm.toLowerCase()));
+            const matchPeriod = selectedPeriods.length === 0 || selectedPeriods.includes(alerta.periodo);
+            const matchPrioridade = filterPrioridade === 'todas' || alerta.prioridadeInfo?.prioridade === filterPrioridade;
+            return matchStatus && matchSearch && matchPeriod && matchPrioridade;
         });
     }, [alertas, filterStatus, searchTerm, selectedPeriods, filterPrioridade]);
-    const handleSelectAlert = (id) => { [cite: 120]
-        const newSelection = new Set(selectedAlerts); [cite: 120]
-        if (newSelection.has(id)) { [cite: 121]
-            newSelection.delete(id); [cite: 121]
+
+    const handleSelectAlert = (id) => {
+        const newSelection = new Set(selectedAlerts);
+        if (newSelection.has(id)) {
+            newSelection.delete(id);
         } else {
-            newSelection.add(id); [cite: 122]
+            newSelection.add(id);
         }
-        setSelectedAlerts(newSelection); [cite: 123]
-        setShowBulkObservacao(false); [cite: 124]
+        setSelectedAlerts(newSelection);
+        setShowBulkObservacao(false);
     };
 
     const handleBulkConclude = async () => {
-        if (selectedAlerts.size === 0) return; [cite: 124]
-        setIsLoading(true); [cite: 125]
+        if (selectedAlerts.size === 0) return;
+        setIsLoading(true);
         
         const { error } = await supabase
-            .from('alertas') [cite: 125]
+            .from('alertas')
             .update({ 
                 status: 'concluido', 
-                observacao: bulkObservacao.trim(), [cite: 126]
-                usuario_conclusao: user.nome, [cite: 126]
-                data_conclusao: new Date().toISOString() [cite: 126]
+                observacao: bulkObservacao.trim(),
+                usuario_conclusao: user.nome,
+                data_conclusao: new Date().toISOString()
             })
-            .in('id', [...selectedAlerts]); [cite: 127]
-        if (error) { [cite: 128]
-            showToast("Erro ao concluir alertas.", "error"); [cite: 128]
+            .in('id', [...selectedAlerts]);
+
+        if (error) {
+            showToast("Erro ao concluir alertas.", "error");
         } else {
-            showToast(`${selectedAlerts.size} alertas concluídos com sucesso!`, "success"); [cite: 129]
-            setSelectedAlerts(new Set()); [cite: 130]
-            setShowBulkObservacao(false); [cite: 130]
-            setBulkObservacao(''); [cite: 130]
-            fetchAlertas(); [cite: 130]
+            showToast(`${selectedAlerts.size} alertas concluídos com sucesso!`, "success");
+            setSelectedAlerts(new Set());
+            setShowBulkObservacao(false);
+            setBulkObservacao('');
+            fetchAlertas();
         }
-        setIsLoading(false); [cite: 130]
+        setIsLoading(false);
     };
 
     const handleShowDetails = async (alerta) => {
-        setDetailedAlert(alerta); [cite: 131]
-        setIsDetailLoading(true); [cite: 132]
+        setDetailedAlert(alerta);
+        setIsDetailLoading(true);
         try {
             if (alerta.tipo_alerta === 'Aferição não realizada') {
-                setDetailedAbastecimentos([]); [cite: 132]
-                setIsDetailLoading(false); [cite: 133]
-                return; [cite: 133]
+                setDetailedAbastecimentos([]);
+                setIsDetailLoading(false);
+                return;
             }
 
-            const [mes, ano] = alerta.periodo.split('/'); [cite: 133]
-            const primeiroDia = new Date(ano, mes - 1, 1); [cite: 134]
-            const ultimoDia = new Date(ano, mes, 0, 23, 59, 59); [cite: 134]
-            const [ticketRes, shellRes] = await Promise.all([ [cite: 135]
-                supabase.from('ticket_abastecimentos').select('*').eq('placa', alerta.placa').gte('data_transacao', primeiroDia.toISOString()).lte('data_transacao', ultimoDia.toISOString()), [cite: 135]
-                supabase.from('shell_abastecimentos').select('*').eq('placa', alerta.placa').gte('data_hora_transacao', primeiroDia.toISOString()).lte('data_hora_transacao', ultimoDia.toISOString()) [cite: 135]
+            const [mes, ano] = alerta.periodo.split('/');
+            const primeiroDia = new Date(ano, mes - 1, 1);
+            const ultimoDia = new Date(ano, mes, 0, 23, 59, 59);
+
+            const [ticketRes, shellRes] = await Promise.all([
+                supabase.from('ticket_abastecimentos').select('*').eq('placa', alerta.placa).gte('data_transacao', primeiroDia.toISOString()).lte('data_transacao', ultimoDia.toISOString()),
+                supabase.from('shell_abastecimentos').select('*').eq('placa', alerta.placa).gte('data_hora_transacao', primeiroDia.toISOString()).lte('data_hora_transacao', ultimoDia.toISOString())
             ]);
-            if(ticketRes.error || shellRes.error) throw new Error("Falha ao buscar abastecimentos."); [cite: 136]
+
+            if(ticketRes.error || shellRes.error) throw new Error("Falha ao buscar abastecimentos.");
 
             const combined = [
-                ...(ticketRes.data || []).map(a => ({...a, plataforma: 'Ticket'})), [cite: 136]
-                ...(shellRes.data || []).map(a => ({...a, plataforma: 'Shell'})) [cite: 136]
+                ...(ticketRes.data || []).map(a => ({...a, plataforma: 'Ticket'})),
+                ...(shellRes.data || []).map(a => ({...a, plataforma: 'Shell'}))
             ];
-            setDetailedAbastecimentos(combined); [cite: 137]
+            setDetailedAbastecimentos(combined);
 
         } catch (err) {
-            showToast(err.message, "error"); [cite: 137]
+            showToast(err.message, "error");
         } finally {
-            setIsDetailLoading(false); [cite: 138]
+            setIsDetailLoading(false);
         }
     };
-    const AlertCard = ({ alerta }) => { [cite: 140]
-        const tipoAlertaBase = alerta.tipo_alerta.startsWith('Combustível não mapeado') ? [cite: 140]
-        'Combustível não mapeado' : alerta.tipo_alerta; [cite: 141]
-        const alertaPrioridade = prioridades.get(tipoAlertaBase) || { prioridade: 'N/D', cor: 'bg-gray-400 text-white' }; [cite: 141]
-        const labelPrincipal = alerta.tipo_alerta === 'Aferição não realizada' ? 'Tanque' : 'Placa'; [cite: 142]
-        return React.createElement('div', { className: `bg-white p-4 rounded-lg shadow-md border-l-4 ${alerta.status === 'pendente' ? 'border-yellow-500' : 'border-green-500'} flex items-start gap-4` }, [cite: 143]
-            alerta.status === 'pendente' && React.createElement('input', { type: 'checkbox', className: 'h-5 w-5 mt-1 text-blue-600 border-gray-300 rounded focus:ring-blue-500', checked: selectedAlerts.has(alerta.id), onChange: () => handleSelectAlert(alerta.id) }), [cite: 143]
+
+    const AlertCard = ({ alerta }) => {
+        const tipoAlertaBase = alerta.tipo_alerta.startsWith('Combustível não mapeado') ? 'Combustível não mapeado' : alerta.tipo_alerta;
+        const alertaPrioridade = prioridades.get(tipoAlertaBase) || { prioridade: 'N/D', cor: 'bg-gray-400 text-white' };
+        const labelPrincipal = alerta.tipo_alerta === 'Aferição não realizada' ? 'Tanque' : 'Placa';
+
+        return React.createElement('div', { className: `bg-white p-4 rounded-lg shadow-md border-l-4 ${alerta.status === 'pendente' ? 'border-yellow-500' : 'border-green-500'} flex items-start gap-4` },
+            alerta.status === 'pendente' && React.createElement('input', { type: 'checkbox', className: 'h-5 w-5 mt-1 text-blue-600 border-gray-300 rounded focus:ring-blue-500', checked: selectedAlerts.has(alerta.id), onChange: () => handleSelectAlert(alerta.id) }),
             React.createElement('div', { className: 'flex-grow' },
-                React.createElement('div', { className: 'flex justify-between items-start' }, [cite: 144]
-                    React.createElement('p', { className: "text-sm text-gray-500" }, `Período: ${alerta.periodo || 'N/A'}`), [cite: 144]
-                    React.createElement('span', { className: `text-xs font-semibold px-2 py-1 rounded-full ${alertaPrioridade.cor}` }, alertaPrioridade.prioridade) [cite: 145]
+                React.createElement('div', { className: 'flex justify-between items-start' },
+                    React.createElement('p', { className: "text-sm text-gray-500" }, `Período: ${alerta.periodo || 'N/A'}`),
+                    React.createElement('span', { className: `text-xs font-semibold px-2 py-1 rounded-full ${alertaPrioridade.cor}` }, alertaPrioridade.prioridade)
                 ),
                 React.createElement('p', { 
-                    className: `text-lg font-bold text-gray-800 mt-1 ${labelPrincipal === 'Placa' ? 'cursor-pointer hover:text-blue-600' : ''}`, [cite: 146]
-                    onClick: labelPrincipal === 'Placa' ? [cite: 146]
-                    () => onViewPlaca(alerta.placa) : null [cite: 147]
-                }, `${labelPrincipal}: ${alerta.placa || [cite: 147]
-                'N/A'}`), [cite: 148]
-                React.createElement('p', { className: "text-sm text-gray-600 mt-1" }, `Alerta: ${alerta.tipo_alerta}`), [cite: 148]
-                alerta.detalhes && React.createElement('p', { className: "text-sm text-red-600 font-semibold mt-1" }, `Detalhe: ${alerta.detalhes}`), [cite: 148]
-                alerta.status === 'concluido' && React.createElement('p', { className: 'text-xs text-gray-500 mt-1 italic' }, `Concluído por ${alerta.usuario_conclusao} com a obs: "${alerta.observacao}"`), [cite: 149]
+                    className: `text-lg font-bold text-gray-800 mt-1 ${labelPrincipal === 'Placa' ? 'cursor-pointer hover:text-blue-600' : ''}`,
+                    onClick: labelPrincipal === 'Placa' ? () => onViewPlaca(alerta.placa) : null
+                }, `${labelPrincipal}: ${alerta.placa || 'N/A'}`),
+                React.createElement('p', { className: "text-sm text-gray-600 mt-1" }, `Alerta: ${alerta.tipo_alerta}`),
+                alerta.detalhes && React.createElement('p', { className: "text-sm text-red-600 font-semibold mt-1" }, `Detalhe: ${alerta.detalhes}`),
+                alerta.status === 'concluido' && React.createElement('p', { className: 'text-xs text-gray-500 mt-1 italic' }, `Concluído por ${alerta.usuario_conclusao} com a obs: "${alerta.observacao}"`),
                 React.createElement('div', { className: 'mt-2' },
-                    React.createElement('button', { onClick: () => handleShowDetails(alerta), className: 'text-sm font-semibold text-blue-600 hover:underline' }, 'Ver Detalhes') [cite: 149]
+                    React.createElement('button', { onClick: () => handleShowDetails(alerta), className: 'text-sm font-semibold text-blue-600 hover:underline' }, 'Ver Detalhes')
                 )
             )
         );
     };
 
     const AlertDetailsModal = () => (
-        React.createElement('div', { className: "fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50", onClick: () => setDetailedAlert(null) }, [cite: 151]
+        React.createElement('div', { className: "fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50", onClick: () => setDetailedAlert(null) },
             React.createElement('div', { className: "bg-white p-6 rounded-xl shadow-2xl max-w-4xl w-full text-left mx-4", onClick: (e) => e.stopPropagation() },
-                React.createElement('h3', { className: 'text-xl font-bold mb-4' }, `Detalhes do Alerta - ${detailedAlert?.tipo_alerta === 'Aferição não realizada' ? 'Tanque' : 'Placa'} ${detailedAlert?.placa}`), [cite: 152]
-                isDetailLoading ? React.createElement('p', null, 'Carregando detalhes...') : [cite: 152]
-                detailedAlert?.tipo_alerta === 'Aferição não realizada' ? React.createElement('p', null, 'Este [cite: 152]
-                tipo de alerta não possui abastecimentos detalhados.') : [cite: 153]
-                detailedAbastecimentos.length === 0 ? React.createElement('p', null, 'Nenhum abastecimento encontrado para este alerta.') : [cite: 153]
+                React.createElement('h3', { className: 'text-xl font-bold mb-4' }, `Detalhes do Alerta - ${detailedAlert?.tipo_alerta === 'Aferição não realizada' ? 'Tanque' : 'Placa'} ${detailedAlert?.placa}`),
+                isDetailLoading ? React.createElement('p', null, 'Carregando detalhes...') :
+                detailedAlert?.tipo_alerta === 'Aferição não realizada' ? React.createElement('p', null, 'Este tipo de alerta não possui abastecimentos detalhados.') :
+                detailedAbastecimentos.length === 0 ? React.createElement('p', null, 'Nenhum abastecimento encontrado para este alerta.') :
                 React.createElement('div', { className: 'max-h-96 overflow-y-auto' },
-                    React.createElement('table', { className: 'w-full text-sm' }, [cite: 154]
+                    React.createElement('table', { className: 'w-full text-sm' },
                         React.createElement('thead', {className: 'bg-gray-100'}, 
-                            React.createElement('tr', null, ['Data', 'Plataforma', [cite: 154]
-                            'Litros', 'Valor Total'].map(h => React.createElement('th', { key: h, className: 'p-2 text-left font-semibold' }, h))) [cite: 155]
+                            React.createElement('tr', null, ['Data', 'Plataforma', 'Litros', 'Valor Total'].map(h => React.createElement('th', { key: h, className: 'p-2 text-left font-semibold' }, h)))
                         ),
                         React.createElement('tbody', null, 
-                            detailedAbastecimentos.map(a => React.createElement('tr', { key: a.id, className: 'border-b' }, [cite: 156]
-                                React.createElement('td', { className: 'p-2' }, new Date(a.data_transacao || [cite: 156]
-                                a.data_hora_transacao).toLocaleString('pt-BR')), [cite: 157]
-                                React.createElement('td', { className: 'p-2' }, a.plataforma), [cite: 157]
-                                React.createElement('td', { className: 'p-2' }, a.litros), [cite: 157]
-                                React.createElement('td', { className: 'p-2' }, `R$ ${(a.valor_emissao || a.total_abastecimento || 0).toFixed(2)}`) [cite: 158]
+                            detailedAbastecimentos.map(a => React.createElement('tr', { key: a.id, className: 'border-b' },
+                                React.createElement('td', { className: 'p-2' }, new Date(a.data_transacao || a.data_hora_transacao).toLocaleString('pt-BR')),
+                                React.createElement('td', { className: 'p-2' }, a.plataforma),
+                                React.createElement('td', { className: 'p-2' }, a.litros),
+                                React.createElement('td', { className: 'p-2' }, `R$ ${(a.valor_emissao || a.total_abastecimento || 0).toFixed(2)}`)
                             ))
                         )
                     )
                 ),
-                React.createElement('button', { onClick: () => setDetailedAlert(null), className: 'mt-6 px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300' }, 'Fechar') [cite: 160]
+                React.createElement('button', { onClick: () => setDetailedAlert(null), className: 'mt-6 px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300' }, 'Fechar')
             )
         )
     );
-    return React.createElement('div', { className: "bg-white p-6 rounded-xl shadow-lg" }, [cite: 161]
-        detailedAlert && React.createElement(AlertDetailsModal, null), [cite: 161]
-        React.createElement('h2', { className: "text-2xl font-bold text-gray-800 mb-2 text-center" }, "Painel de Alertas"), [cite: 161]
-        React.createElement('p', { className: 'text-center text-gray-500 mb-6' }, 'Filtre, analise e gerencie os alertas do sistema.'), [cite: 161]
-        React.createElement('div', { className: 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 p-4 border rounded-lg bg-gray-50 items-end' }, [cite: 162]
+
+    return React.createElement('div', { className: "bg-white p-6 rounded-xl shadow-lg" },
+        detailedAlert && React.createElement(AlertDetailsModal, null),
+        React.createElement('h2', { className: "text-2xl font-bold text-gray-800 mb-2 text-center" }, "Painel de Alertas"),
+        React.createElement('p', { className: 'text-center text-gray-500 mb-6' }, 'Filtre, analise e gerencie os alertas do sistema.'),
+        React.createElement('div', { className: 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 p-4 border rounded-lg bg-gray-50 items-end' },
             React.createElement('div', null, 
-                React.createElement('label', { className: 'block text-sm font-medium mb-1' }, 'Status'), [cite: 163]
+                React.createElement('label', { className: 'block text-sm font-medium mb-1' }, 'Status'),
                 React.createElement('select', { value: filterStatus, onChange: e => setFilterStatus(e.target.value), className: 'w-full p-2 border rounded bg-white' },
-                    React.createElement('option', { value: 'pendente' }, 'Pendentes'), [cite: 163]
-                    React.createElement('option', { value: 'concluido' }, 'Concluídas'), [cite: 164]
-                    React.createElement('option', { value: 'todos' }, 'Todos') [cite: 164]
+                    React.createElement('option', { value: 'pendente' }, 'Pendentes'),
+                    React.createElement('option', { value: 'concluido' }, 'Concluídas'),
+                    React.createElement('option', { value: 'todos' }, 'Todos')
                 )
             ),
-            React.createElement('div', null, [cite: 165]
-                React.createElement('label', { className: 'block text-sm font-medium mb-1' }, 'Prioridade'), [cite: 165]
-                React.createElement('select', { value: filterPrioridade, onChange: e => setFilterPrioridade(e.target.value), className: 'w-full p-2 border rounded bg-white' }, [cite: 166]
-                    React.createElement('option', { value: 'todas' }, 'Todas'), [cite: 166]
-                    React.createElement('option', { value: 'Alta' }, 'Alta'), [cite: 166]
-                    React.createElement('option', { value: 'Média' }, 'Média'), [cite: 167]
-                    React.createElement('option', { value: 'Baixa' }, 'Baixa') [cite: 167]
+            React.createElement('div', null,
+                React.createElement('label', { className: 'block text-sm font-medium mb-1' }, 'Prioridade'),
+                React.createElement('select', { value: filterPrioridade, onChange: e => setFilterPrioridade(e.target.value), className: 'w-full p-2 border rounded bg-white' },
+                    React.createElement('option', { value: 'todas' }, 'Todas'),
+                    React.createElement('option', { value: 'Alta' }, 'Alta'),
+                    React.createElement('option', { value: 'Média' }, 'Média'),
+                    React.createElement('option', { value: 'Baixa' }, 'Baixa')
                 )
             ),
-            React.createElement('div', null, [cite: 168]
-                React.createElement('label', { className: 'block text-sm font-medium mb-1' }, 'Buscar por Placa/Tanque'), [cite: 168]
-                React.createElement('input', { type: 'text', placeholder: 'Digite a placa ou tanque...', value: searchTerm, onChange: e => setSearchTerm(e.target.value), className: 'w-full p-2 border rounded' }) [cite: 169]
+            React.createElement('div', null,
+                React.createElement('label', { className: 'block text-sm font-medium mb-1' }, 'Buscar por Placa/Tanque'),
+                React.createElement('input', { type: 'text', placeholder: 'Digite a placa ou tanque...', value: searchTerm, onChange: e => setSearchTerm(e.target.value), className: 'w-full p-2 border rounded' })
             ),
-             React.createElement('div', null,
-                React.createElement('label', { className: 'block text-sm font-medium mb-1' }, 'Filtrar por Período(s)'), [cite: 170]
-                React.createElement(MultiPeriodoPicker, { allPeriods: allPeriods, selectedPeriods: selectedPeriods, onChange: setSelectedPeriods }) [cite: 170]
+            React.createElement('div', null,
+                React.createElement('label', { className: 'block text-sm font-medium mb-1' }, 'Filtrar por Período(s)'),
+                React.createElement(MultiPeriodoPicker, { allPeriods: allPeriods, selectedPeriods: selectedPeriods, onChange: setSelectedPeriods })
             )
         ),
         
-        selectedAlerts.size > 0 && React.createElement('div', { className: 'mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg' }, [cite: 171]
+        selectedAlerts.size > 0 && React.createElement('div', { className: 'mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg' },
             React.createElement('div', { className: 'flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4' },
-                React.createElement('p', { className: 'font-semibold' }, `${selectedAlerts.size} alertas selecionados`), [cite: 172]
-                !showBulkObservacao && React.createElement('button', { onClick: () => setShowBulkObservacao(true), className: 'px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700' }, 'Concluir Selecionados'), [cite: 172]
-                showBulkObservacao && React.createElement('div', { className: [cite: 172]
-                'flex flex-col sm:flex-row items-stretch gap-2 w-full sm:w-auto' }, [cite: 173]
+                React.createElement('p', { className: 'font-semibold' }, `${selectedAlerts.size} alertas selecionados`),
+                !showBulkObservacao && React.createElement('button', { onClick: () => setShowBulkObservacao(true), className: 'px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700' }, 'Concluir Selecionados'),
+                showBulkObservacao && React.createElement('div', { className: 'flex flex-col sm:flex-row items-stretch gap-2 w-full sm:w-auto' },
                     React.createElement('input', {
                         type: 'text',
-                        placeholder: 'Adicionar observação (opcional)...', [cite: 174]
-                        value: bulkObservacao, [cite: 174]
-                        onChange: (e) => setBulkObservacao(e.target.value), [cite: 174]
-                        className: 'p-2 border rounded w-full sm:w-64' [cite: 175]
+                        placeholder: 'Adicionar observação (opcional)...',
+                        value: bulkObservacao,
+                        onChange: (e) => setBulkObservacao(e.target.value),
+                        className: 'p-2 border rounded w-full sm:w-64'
                     }),
-                    React.createElement('button', { onClick: [cite: 175]
-                    handleBulkConclude, className: 'px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700' }, 'Confirmar'), [cite: 176]
-                    React.createElement('button', { onClick: () => setShowBulkObservacao(false), className: 'px-4 py-2 bg-gray-300 text-black rounded-lg hover:bg-gray-400' }, 'Cancelar') [cite: 176]
+                    React.createElement('button', { onClick: handleBulkConclude, className: 'px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700' }, 'Confirmar'),
+                    React.createElement('button', { onClick: () => setShowBulkObservacao(false), className: 'px-4 py-2 bg-gray-300 text-black rounded-lg hover:bg-gray-400' }, 'Cancelar')
                 )
             )
         ),
 
-        isLoading ? [cite: 177]
-        React.createElement('p', null, 'Carregando alertas...') : [cite: 178]
-        filteredAlerts.length === 0 ? [cite: 178]
-        React.createElement('p', { className: 'text-center text-gray-500 py-8' }, 'Nenhum alerta encontrado para os filtros aplicados.') : [cite: 179]
+        isLoading ?
+        React.createElement('p', null, 'Carregando alertas...') :
+        filteredAlerts.length === 0 ?
+        React.createElement('p', { className: 'text-center text-gray-500 py-8' }, 'Nenhum alerta encontrado para os filtros aplicados.') :
         React.createElement('div', { className: 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4' }, 
-            filteredAlerts.map(alerta => React.createElement(AlertCard, { key: alerta.id, alerta: alerta })) [cite: 179]
+            filteredAlerts.map(alerta => React.createElement(AlertCard, { key: alerta.id, alerta: alerta }))
         )
     );
 }
