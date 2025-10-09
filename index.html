@@ -1533,27 +1533,39 @@
         const [inicio, fim] = dateRange;
         const fimAjustado = new Date(fim);
         fimAjustado.setHours(23, 59, 59);
-        setLoadingMessage('Buscando dados de abastecimento...');
 
-        const ticketPromise = selectedPlataformas.includes('Ticket')
+        // --- INÍCIO DA MUDANÇA ---
+
+        setLoadingMessage('Buscando dados da Ticket...');
+        const ticketRes = await (selectedPlataformas.includes('Ticket')
             ? supabase.from('ticket_abastecimentos').select('cidade, uf, placa, valor_emissao, litros').gte('data_transacao', inicio.toISOString()).lte('data_transacao', fimAjustado.toISOString()).limit(10000)
-            : Promise.resolve({ data: [], error: null }); // CORRIGIDO AQUI
+            : Promise.resolve({ data: [], error: null }));
 
-        const shellPromise = selectedPlataformas.includes('Shell')
+        setLoadingMessage('Buscando dados da Shell...');
+        const shellRes = await (selectedPlataformas.includes('Shell')
             ? supabase.from('shell_abastecimentos').select('cidade, estado, placa, total_abastecimento, litros').gte('data_hora_transacao', inicio.toISOString()).lte('data_hora_transacao', fimAjustado.toISOString()).limit(10000)
-            : Promise.resolve({ data: [], error: null }); // CORRIGIDO AQUI
+            : Promise.resolve({ data: [], error: null }));
 
-        const ctaPromise = selectedPlataformas.includes('CTA')
+        setLoadingMessage('Buscando dados da CTA...');
+        const ctaRes = await (selectedPlataformas.includes('CTA')
             ? supabase.from('cta_abastecimentos').select('cod_posto, placa, custo_total, volume').gte('data_hora_inicio', inicio.toISOString()).lte('data_hora_inicio', fimAjustado.toISOString()).limit(10000)
-            : Promise.resolve({ data: [], error: null }); // CORRIGIDO AQUI
+            : Promise.resolve({ data: [], error: null }));
 
-        const filiaisPromise = supabase.from('filiais').select('cta_cod_posto, nome_filial');
+        setLoadingMessage('Buscando dados de filiais...');
+        const filiaisRes = await supabase.from('filiais').select('cta_cod_posto, nome_filial');
 
-        const [ticketRes, shellRes, ctaRes, filiaisRes] = await Promise.all([ticketPromise, shellPromise, ctaPromise, filiaisPromise]);
+        // --- FIM DA MUDANÇA ---
 
-        if (ticketRes.error || shellRes.error || ctaRes.error || filiaisRes.error) throw new Error("Falha ao buscar dados de abastecimento.");
+        if (ticketRes.error || shellRes.error || ctaRes.error || filiaisRes.error) {
+            // Coleta todas as mensagens de erro para um diagnóstico claro
+            const errorMessages = [ticketRes.error, shellRes.error, ctaRes.error, filiaisRes.error]
+                .filter(Boolean)
+                .map(e => e.message)
+                .join('; ');
+            throw new Error(`Falha ao buscar dados: ${errorMessages}`);
+        }
         
-        const postoCidadeMap = new Map(filiaisRes.data.map(f => [f.cta_cod_posto, f.nome_filial]));
+        const postoCidadeMap = new Map((filiaisRes.data || []).map(f => [f.cta_cod_posto, f.nome_filial]));
         const todosAbastecimentos = [
             ...(ticketRes.data || []).map(a => ({ cidade: a.cidade && a.uf ? `${a.cidade.trim()} - ${a.uf.trim()}` : a.cidade, placa: a.placa, custo: a.valor_emissao, volume: a.litros })),
             ...(shellRes.data || []).map(a => ({ cidade: a.cidade && a.estado ? `${a.cidade.trim()} - ${a.estado.trim()}` : a.cidade, placa: a.placa, custo: a.total_abastecimento, volume: a.litros })),
