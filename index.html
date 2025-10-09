@@ -3416,11 +3416,15 @@ function ShellAbastecimentos({ user, showToast }) {
             // ================================================================
             const initializeSupabaseAndRenderApp = () => {
                 try {
+                    // Inicializa o cliente do projeto principal
                     supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                    
+                    // CORREÇÃO: Adiciona a inicialização do cliente do segundo projeto
                     supabaseProjeto2 = window.supabase.createClient(SUPABASE_URL_PROJETO_2, SUPABASE_ANON_KEY_PROJETO_2);
+                    
                     ReactDOM.render(React.createElement(App), document.getElementById('root'));
                 } catch (e) {
-                    console.error("Erro ao inicializar o cliente Supabase:", e);
+                    console.error("Erro ao inicializar os clientes Supabase:", e);
                 }
             };
 
