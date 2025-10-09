@@ -895,9 +895,9 @@
                         const [inicioB, fimB] = periodoB;
 
                         const [ticketRes, shellRes, ctaRes] = await Promise.all([
-                            supabase.from('ticket_abastecimentos').select('valor_emissao, litros, data_transacao'),
-                            supabase.from('shell_abastecimentos').select('total_abastecimento, litros, data_hora_transacao'),
-                            supabase.from('cta_abastecimentos').select('custo_total, volume, data_hora_inicio')
+                            supabase.from('ticket_abastecimentos').select('valor_emissao, litros, data_transacao').limit(10000), // LIMITE AUMENTADO
+                            supabase.from('shell_abastecimentos').select('total_abastecimento, litros, data_hora_transacao').limit(10000), // LIMITE AUMENTADO
+                            supabase.from('cta_abastecimentos').select('custo_total, volume, data_hora_inicio').limit(10000) // LIMITE AUMENTADO
                         ]);
 
                         if (ticketRes.error || shellRes.error || ctaRes.error) throw new Error("Falha ao buscar dados de abastecimento.");
@@ -1711,7 +1711,6 @@
                 const [chartData, setChartData] = React.useState({ overTime: null, byType: null });
                 const [isLoading, setIsLoading] = React.useState(true);
 
-                // Objeto centralizado para cores, garantindo consistência
                 const priorityColors = {
                     'Alta': { border: 'border-red-500', rgb: '239, 68, 68' },
                     'Média': { border: 'border-yellow-500', rgb: '234, 179, 8' },
@@ -1723,13 +1722,11 @@
                     const canvasRef = React.useRef(null);
                     React.useEffect(() => {
                         if (!canvasRef.current || !data) return;
-                        
                         const chart = new Chart(canvasRef.current, { 
                             type, 
                             data, 
                             options: {
                                 ...options,
-                                // Adiciona a funcionalidade de clique ao gráfico
                                 onClick: (event, elements) => {
                                     if (onClick && elements.length > 0) {
                                         const elementIndex = elements[0].index;
@@ -1749,9 +1746,9 @@
                         setIsLoading(true);
                         try {
                             const [countsRes, overTimeRes, byTypeRes] = await Promise.all([
-                                supabase.from('alertas').select('alerta_prioridades(prioridade)').eq('status', 'pendente'),
-                                supabase.from('alertas').select('periodo, status').order('periodo', { ascending: true }),
-                                supabase.from('alertas').select('tipo_alerta').eq('status', 'pendente')
+                                supabase.from('alertas').select('alerta_prioridades(prioridade)').eq('status', 'pendente').limit(10000), // LIMITE AUMENTADO
+                                supabase.from('alertas').select('periodo, status').order('periodo', { ascending: true }).limit(10000), // LIMITE AUMENTADO
+                                supabase.from('alertas').select('tipo_alerta').eq('status', 'pendente').limit(10000) // LIMITE AUMENTADO
                             ]);
                             
                             if (countsRes.error || overTimeRes.error || byTypeRes.error) throw new Error("Falha ao buscar dados para o dashboard.");
@@ -1791,12 +1788,7 @@
                                 datasets: [{
                                     label: 'Tipos de Alerta',
                                     data: Object.values(byTypeProcessed),
-                                    backgroundColor: [
-                                        `rgb(${priorityColors.Média.rgb})`, 
-                                        `rgb(${priorityColors.Alta.rgb})`, 
-                                        `rgb(${priorityColors.Baixa.rgb})`,
-                                        'rgb(107, 114, 128)' // Cor para outros tipos
-                                    ],
+                                    backgroundColor: [ `rgb(${priorityColors.Média.rgb})`, `rgb(${priorityColors.Alta.rgb})`, `rgb(${priorityColors.Baixa.rgb})`, 'rgb(107, 114, 128)' ],
                                     hoverOffset: 4
                                 }]
                             }}));
@@ -1812,9 +1804,6 @@
                 }, [showToast]);
 
                 const handleChartClick = (clickedLabel) => {
-                    // Por enquanto, esta função não faz nada, mas está pronta para o futuro filtro
-                    console.log("Clicou em:", clickedLabel);
-                    // Futuramente: setCurrentPage('alertas', { filtro: clickedLabel });
                     showToast(`Funcionalidade de filtro por clique em '${clickedLabel}' em desenvolvimento.`, "info");
                 };
 
@@ -1855,9 +1844,7 @@
                             React.createElement(ChartContainer, { title: 'Alertas Gerados vs. Concluídos por Período' },
                                 isLoading || !chartData.overTime ? React.createElement('p', { className: 'text-center pt-10' }, 'Carregando...') :
                                 React.createElement(ChartComponent, { 
-                                    chartId: 'overTimeChart', 
-                                    type: 'line', 
-                                    data: chartData.overTime,
+                                    chartId: 'overTimeChart', type: 'line', data: chartData.overTime,
                                     options: { maintainAspectRatio: false, responsive: true }
                                 })
                             )
@@ -1865,20 +1852,15 @@
                         React.createElement(ChartContainer, { title: 'Tipos de Alertas Pendentes' },
                             isLoading || !chartData.byType ? React.createElement('p', { className: 'text-center pt-10' }, 'Carregando...') :
                             React.createElement(ChartComponent, {
-                                chartId: 'byTypeChart',
-                                type: 'doughnut',
-                                data: chartData.byType,
+                                chartId: 'byTypeChart', type: 'doughnut', data: chartData.byType,
                                 options: { 
-                                    maintainAspectRatio: false, 
-                                    responsive: true,
+                                    maintainAspectRatio: false, responsive: true,
                                     plugins: {
                                         tooltip: {
                                             callbacks: {
                                                 label: function(context) {
                                                     let label = context.label || '';
-                                                    if (label) {
-                                                        label += ': ';
-                                                    }
+                                                    if (label) { label += ': '; }
                                                     const value = context.parsed;
                                                     const sum = context.dataset.data.reduce((a, b) => a + b, 0);
                                                     const percentage = sum > 0 ? ((value / sum) * 100).toFixed(1) + '%' : '0%';
@@ -2784,6 +2766,7 @@ function ShellAbastecimentos({ user, showToast }) {
                             .from('alertas')
                             .select('*, alerta_prioridades ( prioridade, cor_badge )')
                             .order('data_criacao', { ascending: false });
+                            .limit(10000);
 
                         if (alertasError) throw alertasError;
                         
