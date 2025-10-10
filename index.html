@@ -174,7 +174,23 @@
                     dangerouslySetInnerHTML: { __html: icons[name] || '' }
                 });
             }
+            //
+// COLE ESTA FUNÇÃO NA SEÇÃO DE HELPERS DO SEU CÓDIGO
+//
+function getPeriodsInRange(startDate, endDate) {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const periods = new Set();
+    let current = new Date(start.getFullYear(), start.getMonth(), 1);
 
+    while (current <= end) {
+        const month = String(current.getMonth() + 1).padStart(2, '0');
+        const year = current.getFullYear();
+        periods.add(`${month}/${year}`);
+        current.setMonth(current.getMonth() + 1);
+    }
+    return Array.from(periods);
+}
             function Toast({ message, type, onClose }) {
                 const bgColor = type === 'success' ? 'bg-green-500' : 'bg-red-500';
                 React.useEffect(() => {
@@ -1542,77 +1558,85 @@ const [ticketRes, shellRes, ctaRes] = await Promise.all([
     };
 
     // FUNÇÃO MODIFICADA
-    const fetchData = async () => {
-        setIsLoading(true);
-        try {
-            const queries = [
-                supabase.from('alertas').select('alerta_prioridades(prioridade)').eq('status', 'pendente'),
-                supabase.from('alertas').select('periodo, status').order('periodo', { ascending: true }),
-                supabase.from('alertas').select('tipo_alerta').eq('status', 'pendente')
-            ];
+    //
+// SUBSTITUA A FUNÇÃO fetchData DO SEU DASHBOARD POR ESTA
+//
+const fetchData = async () => {
+    setIsLoading(true);
+    try {
+        // As 3 queries base continuam as mesmas
+        const queries = [
+            supabase.from('alertas').select('alerta_prioridades(prioridade)').eq('status', 'pendente'),
+            supabase.from('alertas').select('periodo, status').order('periodo', { ascending: true }),
+            supabase.from('alertas').select('tipo_alerta').eq('status', 'pendente')
+        ];
 
-            if (dateRange && dateRange.length === 2) {
-                const [inicio, fim] = dateRange;
-                const fimAjustado = new Date(fim);
-                fimAjustado.setHours(23, 59, 59);
-
+        // LÓGICA DE FILTRO CORRIGIDA
+        if (dateRange && dateRange.length === 2) {
+            const [inicio, fim] = dateRange;
+            const periodosParaFiltrar = getPeriodsInRange(inicio, fim);
+            
+            if (periodosParaFiltrar.length > 0) {
+                // Aplica o filtro pelo campo 'periodo' usando a lista de strings "MM/AAAA"
                 queries.forEach(query => {
-                    query.gte('data_criacao', inicio.toISOString()).lte('data_criacao', fimAjustado.toISOString());
+                    query.in('periodo', periodosParaFiltrar);
                 });
             }
-            
-            queries.forEach(query => query.limit(10000));
-
-            const [countsRes, overTimeRes, byTypeRes] = await Promise.all(queries);
-
-            if (countsRes.error || overTimeRes.error || byTypeRes.error) throw new Error("Falha ao buscar dados para o dashboard.");
-
-            const counts = countsRes.data.reduce((acc, alerta) => {
-                const prioridade = alerta.alerta_prioridades?.prioridade || 'N/D';
-                acc[prioridade] = (acc[prioridade] || 0) + 1;
-                acc.total++;
-                return acc;
-            }, { Alta: 0, Média: 0, Baixa: 0, total: 0 });
-            setStats(counts);
-
-            const overTimeProcessed = overTimeRes.data.reduce((acc, { periodo, status }) => {
-                if (!periodo) return acc;
-                acc[periodo] = acc[periodo] || { pendente: 0, concluido: 0 };
-                if (status === 'pendente') acc[periodo].pendente++;
-                if (status === 'concluido') acc[periodo].concluido++;
-                return acc;
-            }, {});
-            const overTimeLabels = Object.keys(overTimeProcessed);
-            setChartData(prev => ({ ...prev, overTime: {
-                labels: overTimeLabels,
-                datasets: [
-                    { label: 'Pendentes', data: overTimeLabels.map(p => overTimeProcessed[p].pendente), borderColor: `rgb(${priorityColors.Média.rgb})`, backgroundColor: `rgba(${priorityColors.Média.rgb}, 0.5)`, tension: 0.1, pointRadius: 5, pointHoverRadius: 7 },
-                    { label: 'Concluídos', data: overTimeLabels.map(p => overTimeProcessed[p].concluido), borderColor: `rgb(${priorityColors.Concluído.rgb})`, backgroundColor: `rgba(${priorityColors.Concluído.rgb}, 0.5)`, tension: 0.1, pointRadius: 5, pointHoverRadius: 7 }
-                ]
-            }}));
-
-            const byTypeProcessed = byTypeRes.data.reduce((acc, { tipo_alerta }) => {
-                const tipoBase = tipo_alerta.startsWith('Combustível não mapeado') ? 'Combustível não mapeado' : tipo_alerta;
-                acc[tipoBase] = (acc[tipoBase] || 0) + 1;
-                return acc;
-            }, {});
-            const byTypeLabels = Object.keys(byTypeProcessed);
-            setChartData(prev => ({ ...prev, byType: {
-                labels: byTypeLabels,
-                datasets: [{
-                    label: 'Tipos de Alerta',
-                    data: Object.values(byTypeProcessed),
-                    backgroundColor: [ `rgb(${priorityColors.Média.rgb})`, `rgb(${priorityColors.Alta.rgb})`, `rgb(${priorityColors.Baixa.rgb})`, 'rgb(107, 114, 128)' ],
-                    hoverOffset: 4
-                }]
-            }}));
-        } catch (err) {
-            console.error("Erro ao montar o dashboard:", err);
-            showToast("Não foi possível carregar os dados do dashboard.", "error");
         }
-        setIsLoading(false);
-    };
+        
+        // Adiciona o limite após os filtros
+        queries.forEach(query => query.limit(10000));
 
+        const [countsRes, overTimeRes, byTypeRes] = await Promise.all(queries);
+
+        if (countsRes.error || overTimeRes.error || byTypeRes.error) throw new Error("Falha ao buscar dados para o dashboard.");
+
+        // O restante da função para processar os dados continua exatamente igual
+        const counts = countsRes.data.reduce((acc, alerta) => {
+            const prioridade = alerta.alerta_prioridades?.prioridade || 'N/D';
+            acc[prioridade] = (acc[prioridade] || 0) + 1;
+            acc.total++;
+            return acc;
+        }, { Alta: 0, Média: 0, Baixa: 0, total: 0 });
+        setStats(counts);
+
+        const overTimeProcessed = overTimeRes.data.reduce((acc, { periodo, status }) => {
+            if (!periodo) return acc;
+            acc[periodo] = acc[periodo] || { pendente: 0, concluido: 0 };
+            if (status === 'pendente') acc[periodo].pendente++;
+            if (status === 'concluido') acc[periodo].concluido++;
+            return acc;
+        }, {});
+        const overTimeLabels = Object.keys(overTimeProcessed);
+        setChartData(prev => ({ ...prev, overTime: {
+            labels: overTimeLabels,
+            datasets: [
+                { label: 'Pendentes', data: overTimeLabels.map(p => overTimeProcessed[p].pendente), borderColor: `rgb(${priorityColors.Média.rgb})`, backgroundColor: `rgba(${priorityColors.Média.rgb}, 0.5)`, tension: 0.1, pointRadius: 5, pointHoverRadius: 7 },
+                { label: 'Concluídos', data: overTimeLabels.map(p => overTimeProcessed[p].concluido), borderColor: `rgb(${priorityColors.Concluído.rgb})`, backgroundColor: `rgba(${priorityColors.Concluído.rgb}, 0.5)`, tension: 0.1, pointRadius: 5, pointHoverRadius: 7 }
+            ]
+        }}));
+
+        const byTypeProcessed = byTypeRes.data.reduce((acc, { tipo_alerta }) => {
+            const tipoBase = tipo_alerta.startsWith('Combustível não mapeado') ? 'Combustível não mapeado' : tipo_alerta;
+            acc[tipoBase] = (acc[tipoBase] || 0) + 1;
+            return acc;
+        }, {});
+        const byTypeLabels = Object.keys(byTypeProcessed);
+        setChartData(prev => ({ ...prev, byType: {
+            labels: byTypeLabels,
+            datasets: [{
+                label: 'Tipos de Alerta',
+                data: Object.values(byTypeProcessed),
+                backgroundColor: [ `rgb(${priorityColors.Média.rgb})`, `rgb(${priorityColors.Alta.rgb})`, `rgb(${priorityColors.Baixa.rgb})`, 'rgb(107, 114, 128)' ],
+                hoverOffset: 4
+            }]
+        }}));
+    } catch (err) {
+        console.error("Erro ao montar o dashboard:", err);
+        showToast("Não foi possível carregar os dados do dashboard.", "error");
+    }
+    setIsLoading(false);
+};
     // USE EFFECT MODIFICADO
     React.useEffect(() => {
         fetchData();
